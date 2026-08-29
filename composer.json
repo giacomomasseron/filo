@@ -1,0 +1,29 @@
+{
+    "name": "giacomomasseron/filo",
+    "description": "Filo - zero-extension PHP call tracer: userland instrumentation via stream wrapper + AST rewriting",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Giacomo Masseroni",
+            "email": "giacomom@gmail.com",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": "^8.1",
+        "nikic/php-parser": "^5.0",
+        "ext-tokenizer": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "Filo\\": "src/"
+        },
+        "files": [
+            "bootstrap.php"
+        ]
+    },
+    "config": {
+        "sort-packages": true
+    }
+}

@@ -1,0 +1,463 @@
+{
+  "version": 1,
+  "ts": "2026-08-29T10:42:17+02:00",
+  "duration": 17942278,
+  "capped": false,
+  "context": {
+    "sapi": "fpm-fcgi",
+    "method": "GET",
+    "uri": "/orders?page=1"
+  },
+  "events": [
+    {
+      "i": 0,
+      "p": -1,
+      "fn": "App\\Http\\Kernel::handle",
+      "file": "/app/app/Http/Kernel.php",
+      "line": 41,
+      "s": 150000,
+      "e": 17742278,
+      "m": 2400000
+    },
+    {
+      "i": 1,
+      "p": 0,
+      "fn": "App\\Http\\Middleware\\TrustProxies::handle",
+      "file": "/app/app/Http/Middleware/TrustProxies.php",
+      "line": 17,
+      "s": 190000,
+      "e": 17692278,
+      "m": 2600000
+    },
+    {
+      "i": 2,
+      "p": 0,
+      "fn": "App\\Http\\Middleware\\EncryptCookies::handle",
+      "file": "/app/app/Http/Middleware/EncryptCookies.php",
+      "line": 22,
+      "s": 250000,
+      "e": 17662278,
+      "m": 2600000
+    },
+    {
+      "i": 3,
+      "p": 0,
+      "fn": "App\\Http\\Middleware\\VerifyCsrfToken::handle",
+      "file": "/app/app/Http/Middleware/VerifyCsrfToken.php",
+      "line": 30,
+      "s": 310000,
+      "e": 17632278,
+      "m": 2600000
+    },
+    {
+      "i": 4,
+      "p": 0,
+      "fn": "App\\Http\\Middleware\\Authenticate::handle",
+      "file": "/app/app/Http/Middleware/Authenticate.php",
+      "line": 15,
+      "s": 370000,
+      "e": 17602278,
+      "m": 2600000
+    },
+    {
+      "i": 5,
+      "p": 4,
+      "fn": "App\\Repositories\\UserRepository::findForToken",
+      "file": "/app/app/Repositories/UserRepository.php",
+      "line": 28,
+      "s": 430000,
+      "e": 2830000,
+      "m": 2800000
+    },
+    {
+      "i": 6,
+      "p": 5,
+      "fn": "App\\Support\\QueryLogger::log",
+      "file": "/app/app/Support/QueryLogger.php",
+      "line": 12,
+      "s": 2580000,
+      "e": 2670000,
+      "m": 2850000
+    },
+    {
+      "i": 7,
+      "p": 0,
+      "fn": "App\\Http\\Controllers\\OrderController::index",
+      "file": "/app/app/Http/Controllers/OrderController.php",
+      "line": 34,
+      "s": 2930000,
+      "e": 17572278,
+      "m": 3000000
+    },
+    {
+      "i": 8,
+      "p": 7,
+      "fn": "App\\Services\\OrderService::listForUser",
+      "file": "/app/app/Services/OrderService.php",
+      "line": 51,
+      "s": 2960000,
+      "e": 15857278,
+      "m": 3050000
+    },
+    {
+      "i": 9,
+      "p": 8,
+      "fn": "App\\Repositories\\OrderRepository::paginateByUser",
+      "file": "/app/app/Repositories/OrderRepository.php",
+      "line": 66,
+      "s": 2980000,
+      "e": 11180000,
+      "m": 3200000
+    },
+    {
+      "i": 10,
+      "p": 9,
+      "fn": "App\\Support\\QueryLogger::log",
+      "file": "/app/app/Support/QueryLogger.php",
+      "line": 12,
+      "s": 10880000,
+      "e": 10990000,
+      "m": 3400000
+    },
+    {
+      "i": 11,
+      "p": 8,
+      "fn": "App\\Services\\TaxCalculator::forOrder",
+      "file": "/app/app/Services/TaxCalculator.php",
+      "line": 23,
+      "s": 11280000,
+      "e": 11544890,
+      "m": 3450000
+    },
+    {
+      "i": 12,
+      "p": 11,
+      "fn": "App\\Support\\Money::of",
+      "file": "/app/app/Support/Money.php",
+      "line": 18,
+      "s": 11300000,
+      "e": 11315000,
+      "m": 3460000
+    },
+    {
+      "i": 13,
+      "p": 8,
+      "fn": "App\\Services\\TaxCalculator::forOrder",
+      "file": "/app/app/Services/TaxCalculator.php",
+      "line": 23,
+      "s": 11569890,
+      "e": 11789434,
+      "m": 3462000
+    },
+    {
+      "i": 14,
+      "p": 13,
+      "fn": "App\\Support\\Money::of",
+      "file": "/app/app/Support/Money.php",
+      "line": 18,
+      "s": 11589890,
+      "e": 11604890,
+      "m": 3472000
+    },
+    {
+      "i": 15,
+      "p": 8,
+      "fn": "App\\Services\\TaxCalculator::forOrder",
+      "file": "/app/app/Services/TaxCalculator.php",
+      "line": 23,
+      "s": 11814434,
+      "e": 12097934,
+      "m": 3474000
+    },
+    {
+      "i": 16,
+      "p": 15,
+      "fn": "App\\Support\\Money::of",
+      "file": "/app/app/Support/Money.php",
+      "line": 18,
+      "s": 11834434,
+      "e": 11849434,
+      "m": 3484000
+    },
+    {
+      "i": 17,
+      "p": 8,
+      "fn": "App\\Services\\TaxCalculator::forOrder",
+      "file": "/app/app/Services/TaxCalculator.php",
+      "line": 23,
+      "s": 12122934,
+      "e": 12473572,
+      "m": 3486000
+    },
+    {
+      "i": 18,
+      "p": 17,
+      "fn": "App\\Support\\Money::of",
+      "file": "/app/app/Support/Money.php",
+      "line": 18,
+      "s": 12142934,
+      "e": 12157934,
+      "m": 3496000
+    },
+    {
+      "i": 19,
+      "p": 8,
+      "fn": "App\\Services\\TaxCalculator::forOrder",
+      "file": "/app/app/Services/TaxCalculator.php",
+      "line": 23,
+      "s": 12498572,
+      "e": 12691229,
+      "m": 3498000
+    },
+    {
+      "i": 20,
+      "p": 19,
+      "fn": "App\\Support\\Money::of",
+      "file": "/app/app/Support/Money.php",
+      "line": 18,
+      "s": 12518572,
+      "e": 12533572,
+      "m": 3508000
+    },
+    {
+      "i": 21,
+      "p": 8,
+      "fn": "App\\Services\\TaxCalculator::forOrder",
+      "file": "/app/app/Services/TaxCalculator.php",
+      "line": 23,
+      "s": 12716229,
+      "e": 12915217,
+      "m": 3510000
+    },
+    {
+      "i": 22,
+      "p": 21,
+      "fn": "App\\Support\\Money::of",
+      "file": "/app/app/Support/Money.php",
+      "line": 18,
+      "s": 12736229,
+      "e": 12751229,
+      "m": 3520000
+    },
+    {
+      "i": 23,
+      "p": 8,
+      "fn": "App\\Services\\TaxCalculator::forOrder",
+      "file": "/app/app/Services/TaxCalculator.php",
+      "line": 23,
+      "s": 12940217,
+      "e": 13335509,
+      "m": 3522000
+    },
+    {
+      "i": 24,
+      "p": 23,
+      "fn": "App\\Support\\Money::of",
+      "file": "/app/app/Support/Money.php",
+      "line": 18,
+      "s": 12960217,
+      "e": 12975217,
+      "m": 3532000
+    },
+    {
+      "i": 25,
+      "p": 8,
+      "fn": "App\\Services\\TaxCalculator::forOrder",
+      "file": "/app/app/Services/TaxCalculator.php",
+      "line": 23,
+      "s": 13360509,
+      "e": 13680987,
+      "m": 3534000
+    },
+    {
+      "i": 26,
+      "p": 25,
+      "fn": "App\\Support\\Money::of",
+      "file": "/app/app/Support/Money.php",
+      "line": 18,
+      "s": 13380509,
+      "e": 13395509,
+      "m": 3544000
+    },
+    {
+      "i": 27,
+      "p": 8,
+      "fn": "App\\Services\\TaxCalculator::forOrder",
+      "file": "/app/app/Services/TaxCalculator.php",
+      "line": 23,
+      "s": 13705987,
+      "e": 13910662,
+      "m": 3546000
+    },
+    {
+      "i": 28,
+      "p": 27,
+      "fn": "App\\Support\\Money::of",
+      "file": "/app/app/Support/Money.php",
+      "line": 18,
+      "s": 13725987,
+      "e": 13740987,
+      "m": 3556000
+    },
+    {
+      "i": 29,
+      "p": 8,
+      "fn": "App\\Services\\TaxCalculator::forOrder",
+      "file": "/app/app/Services/TaxCalculator.php",
+      "line": 23,
+      "s": 13935662,
+      "e": 14211525,
+      "m": 3558000
+    },
+    {
+      "i": 30,
+      "p": 29,
+      "fn": "App\\Support\\Money::of",
+      "file": "/app/app/Support/Money.php",
+      "line": 18,
+      "s": 13955662,
+      "e": 13970662,
+      "m": 3568000
+    },
+    {
+      "i": 31,
+      "p": 8,
+      "fn": "App\\Services\\TaxCalculator::forOrder",
+      "file": "/app/app/Services/TaxCalculator.php",
+      "line": 23,
+      "s": 14236525,
+      "e": 14569299,
+      "m": 3570000
+    },
+    {
+      "i": 32,
+      "p": 31,
+      "fn": "App\\Support\\Money::of",
+      "file": "/app/app/Support/Money.php",
+      "line": 18,
+      "s": 14256525,
+      "e": 14271525,
+      "m": 3580000
+    },
+    {
+      "i": 33,
+      "p": 8,
+      "fn": "App\\Services\\TaxCalculator::forOrder",
+      "file": "/app/app/Services/TaxCalculator.php",
+      "line": 23,
+      "s": 14594299,
+      "e": 14789503,
+      "m": 3582000
+    },
+    {
+      "i": 34,
+      "p": 33,
+      "fn": "App\\Support\\Money::of",
+      "file": "/app/app/Support/Money.php",
+      "line": 18,
+      "s": 14614299,
+      "e": 14629299,
+      "m": 3592000
+    },
+    {
+      "i": 35,
+      "p": 8,
+      "fn": "App\\Services\\TaxCalculator::forOrder",
+      "file": "/app/app/Services/TaxCalculator.php",
+      "line": 23,
+      "s": 14814503,
+      "e": 15232976,
+      "m": 3594000
+    },
+    {
+      "i": 36,
+      "p": 35,
+      "fn": "App\\Support\\Money::of",
+      "file": "/app/app/Support/Money.php",
+      "line": 18,
+      "s": 14834503,
+      "e": 14849503,
+      "m": 3604000
+    },
+    {
+      "i": 37,
+      "p": 8,
+      "fn": "App\\Services\\TaxCalculator::forOrder",
+      "file": "/app/app/Services/TaxCalculator.php",
+      "line": 23,
+      "s": 15257976,
+      "e": 15570997,
+      "m": 3606000
+    },
+    {
+      "i": 38,
+      "p": 37,
+      "fn": "App\\Support\\Money::of",
+      "file": "/app/app/Support/Money.php",
+      "line": 18,
+      "s": 15277976,
+      "e": 15292976,
+      "m": 3616000
+    },
+    {
+      "i": 39,
+      "p": 8,
+      "fn": "App\\Services\\TaxCalculator::forOrder",
+      "file": "/app/app/Services/TaxCalculator.php",
+      "line": 23,
+      "s": 15595997,
+      "e": 15832278,
+      "m": 3618000
+    },
+    {
+      "i": 40,
+      "p": 39,
+      "fn": "App\\Support\\Money::of",
+      "file": "/app/app/Support/Money.php",
+      "line": 18,
+      "s": 15615997,
+      "e": 15630997,
+      "m": 3628000
+    },
+    {
+      "i": 41,
+      "p": 7,
+      "fn": "App\\Http\\Resources\\OrderResource::collection",
+      "file": "/app/app/Http/Resources/OrderResource.php",
+      "line": 19,
+      "s": 15872278,
+      "e": 17472278,
+      "m": 3900000
+    },
+    {
+      "i": 42,
+      "p": 41,
+      "fn": "App\\Http\\Resources\\OrderResource::toArray",
+      "file": "/app/app/Http/Resources/OrderResource.php",
+      "line": 27,
+      "s": 15992278,
+      "e": 16342278,
+      "m": 3920000
+    },
+    {
+      "i": 43,
+      "p": 41,
+      "fn": "App\\Http\\Resources\\OrderResource::toArray",
+      "file": "/app/app/Http/Resources/OrderResource.php",
+      "line": 27,
+      "s": 16392278,
+      "e": 16742278,
+      "m": 3920000
+    },
+    {
+      "i": 44,
+      "p": 41,
+      "fn": "App\\Http\\Resources\\OrderResource::toArray",
+      "file": "/app/app/Http/Resources/OrderResource.php",
+      "line": 27,
+      "s": 16792278,
+      "e": 17142278,
+      "m": 3920000
+    }
+  ]
+}
