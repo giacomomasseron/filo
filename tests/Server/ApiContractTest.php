@@ -93,14 +93,20 @@ test('breakpoints round-trip in the UI shape', function (): void {
 
 test('/api/traces returns full traces newest first, including tests/ artifacts', function (): void {
     $trace = fn (string $ts) => json_encode(['version' => 1, 'ts' => $ts, 'duration' => 1, 'capped' => false, 'context' => ['sapi' => 'cli'], 'events' => []]);
-    file_put_contents(ApiServer::$root . '/.filo/traces/20260101-000000-aaaa.json', $trace('old'));
-    file_put_contents(ApiServer::$root . '/.filo/traces/20260102-000000-bbbb.json', $trace('new'));
-    file_put_contents(ApiServer::$root . '/.filo/traces/tests/FooTest__bar.json', $trace('test'));
+    $write = function (string $name, string $ts, int $mtime) use ($trace): void {
+        $path = ApiServer::$root . '/.filo/traces/' . $name;
+        file_put_contents($path, $trace($ts));
+        touch($path, $mtime); // mtime, not name, decides the order
+    };
+    // The tests/ artifact is the OLDEST: a name sort would put it first.
+    $write('20260101-000000-aaaa.json', 'old', 1_800_000_200);
+    $write('20260102-000000-bbbb.json', 'new', 1_800_000_300);
+    $write('tests/FooTest__bar.json', 'test', 1_800_000_100);
     file_put_contents(ApiServer::$root . '/.filo/traces/breaks-not-a-trace.json', '{"nope":true}');
 
     [$status, $list] = ApiServer::call('GET', '/api/traces');
     expect($status)->toBe(200)
-        ->and(array_column($list, 'name'))->toBe(['tests/FooTest__bar.json', '20260102-000000-bbbb.json', '20260101-000000-aaaa.json'])
+        ->and(array_column($list, 'name'))->toBe(['20260102-000000-bbbb.json', '20260101-000000-aaaa.json', 'tests/FooTest__bar.json'])
         ->and($list[1])->toHaveKeys(['version', 'ts', 'duration', 'capped', 'context', 'events', 'name']);
 
     [$status, $one] = ApiServer::call('GET', '/api/traces/tests/FooTest__bar.json');

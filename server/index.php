@@ -60,11 +60,16 @@ if (str_starts_with($path, '/api/') && $method !== 'GET' && ($_SERVER['HTTP_X_FI
 const TRACE_LIST_LIMIT = 50;
 
 if ($path === '/api/traces' && $method === 'GET') {
-    // File names start with Ymd-His, so a reverse name sort is newest-first.
-    // tests/ artifacts (Class__method.json) sort after digits and so come first.
+    // Newest first by mtime: a name sort would rank every tests/ artifact
+    // (Class__method.json) above the Ymd-His request traces and, past the
+    // limit, hide the request traces entirely. Name desc breaks ties.
     $dir   = rtrim($outputDir, '/');
     $files = array_merge(glob($dir . '/*.json') ?: [], glob($dir . '/tests/*.json') ?: []);
-    rsort($files, SORT_STRING);
+    $mtime = [];
+    foreach ($files as $f) {
+        $mtime[$f] = @filemtime($f) ?: 0;
+    }
+    usort($files, static fn (string $a, string $b): int => [$mtime[$b], $b] <=> [$mtime[$a], $a]);
 
     $out = [];
     foreach (array_slice($files, 0, TRACE_LIST_LIMIT) as $f) {
