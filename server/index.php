@@ -10,13 +10,21 @@ declare(strict_types=1);
  * and — with breakpoints — variable values. Do not expose this port.
  *
  * ── HTTP API (contract for the designed UI) ───────────────────────────
- *  GET  /api/traces                     -> [{name, ts, duration, context, events_count}]
- *  GET  /api/traces/{name}              -> full trace JSON (schema: README "Trace format")
+ *  GET  /api/traces                     -> [full trace JSON + {name}], newest first, at most
+ *                                          TRACE_LIST_LIMIT entries (the UI renders straight
+ *                                          from `events`, so summaries aren't enough)
+ *  GET  /api/traces/{name}              -> one full trace JSON (schema: README "Trace format")
  *  GET  /api/breaks                     -> [{id, fn, file, line, ts, uri, vars}]
  *  POST /api/breaks/{id}/continue       -> release one paused request
  *  POST /api/breaks/continue-all        -> release all
- *  GET  /api/breakpoints                -> {breakpoints: [...]}
- *  PUT  /api/breakpoints                -> replace list  (body: {"breakpoints": [...]})
+ *  GET  /api/breakpoints                -> [{id, fn, enabled}] (or {id, file, line, enabled})
+ *  PUT  /api/breakpoints                -> replace list; body is the same bare array
+ *                                          (a legacy {"breakpoints": [...]} wrapper and
+ *                                          plain "Class::method" strings are accepted too)
+ *
+ * breakpoints.json stores the object form. Only `fn` breakpoints can fire
+ * (Debugger matches __METHOD__); file:line entries are kept for the UI
+ * but never trigger — see Debugger.php.
  *  GET  /                               -> built-in minimal UI (replaceable)
  *
  * Mutating endpoints (POST/PUT) REQUIRE the header `X-Filo: 1`. A custom
@@ -47,23 +55,22 @@ if (str_starts_with($path, '/api/') && $method !== 'GET' && ($_SERVER['HTTP_X_FI
 }
 
 // ── /api/traces ───────────────────────────────────────────────────────
+const TRACE_LIST_LIMIT = 50;
+
 if ($path === '/api/traces' && $method === 'GET') {
+    // File names start with Ymd-His, so a reverse name sort is newest-first.
+    $files = glob(rtrim($outputDir, '/') . '/*.json') ?: [];
+    rsort($files, SORT_STRING);
+
     $out = [];
-    foreach (glob(rtrim($outputDir, '/') . '/*.json') ?: [] as $f) {
+    foreach (array_slice($files, 0, TRACE_LIST_LIMIT) as $f) {
         $t = json_decode((string) file_get_contents($f), true);
-        if (!is_array($t)) {
+        if (!is_array($t) || !isset($t['events'])) {
             continue;
         }
-        $out[] = [
-            'name'         => basename($f),
-            'ts'           => $t['ts'] ?? null,
-            'duration'     => $t['duration'] ?? 0,
-            'context'      => $t['context'] ?? [],
-            'events_count' => count($t['events'] ?? []),
-            'capped'       => $t['capped'] ?? false,
-        ];
+        $t['name'] = basename($f);
+        $out[]     = $t;
     }
-    usort($out, static fn ($a, $b) => strcmp($b['name'], $a['name']));
     $json($out);
 }
 
@@ -100,17 +107,52 @@ if (preg_match('#^/api/breaks/([A-Za-z0-9-]+)/continue$#', $path, $m) && $method
 }
 
 // ── /api/breakpoints ──────────────────────────────────────────────────
-if ($path === '/api/breakpoints' && $method === 'GET') {
+/** Accepts a string ("App\\Foo::bar") or an object; returns the canonical object or null. */
+$normalizeBp = static function (mixed $item): ?array {
+    if (is_string($item)) {
+        $item = ['fn' => $item];
+    }
+    if (!is_array($item)) {
+        return null;
+    }
+    $fn   = isset($item['fn']) && is_string($item['fn']) ? trim($item['fn']) : '';
+    $file = isset($item['file']) && is_string($item['file']) ? trim($item['file']) : '';
+    $line = isset($item['line']) && is_numeric($item['line']) ? (int) $item['line'] : 0;
+    if ($fn === '' && ($file === '' || $line <= 0)) {
+        return null;
+    }
+    $out = ['id' => isset($item['id']) && is_string($item['id']) && $item['id'] !== ''
+        ? $item['id']
+        : 'bp_' . substr(md5($fn !== '' ? $fn : $file . ':' . $line), 0, 8)];
+    if ($fn !== '') {
+        $out['fn'] = $fn;
+    } else {
+        $out['file'] = $file;
+        $out['line'] = $line;
+    }
+    $out['enabled'] = !array_key_exists('enabled', $item) || (bool) $item['enabled'];
+
+    return $out;
+};
+
+$readBps = static function () use ($bpFile, $normalizeBp): array {
     $cfg = is_file($bpFile) ? json_decode((string) file_get_contents($bpFile), true) : null;
-    $json(['breakpoints' => array_values((array) ($cfg['breakpoints'] ?? []))]);
+    $raw = is_array($cfg) ? ($cfg['breakpoints'] ?? $cfg) : [];
+
+    return array_values(array_filter(array_map($normalizeBp, (array) $raw)));
+};
+
+if ($path === '/api/breakpoints' && $method === 'GET') {
+    $json($readBps());
 }
 
 if ($path === '/api/breakpoints' && $method === 'PUT') {
     $body = json_decode((string) file_get_contents('php://input'), true);
-    $list = array_values(array_filter((array) ($body['breakpoints'] ?? []), 'is_string'));
+    $raw  = is_array($body) ? ($body['breakpoints'] ?? $body) : [];
+    $list = array_values(array_filter(array_map($normalizeBp, (array) $raw)));
     is_dir(dirname($bpFile)) || @mkdir(dirname($bpFile), 0777, true);
     file_put_contents($bpFile, json_encode(['breakpoints' => $list], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
-    $json(['breakpoints' => $list]);
+    $json($list);
 }
 
 if (str_starts_with($path, '/api/')) {

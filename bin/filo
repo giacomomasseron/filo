@@ -39,8 +39,18 @@ $loadBp = static function () use ($bpFile): array {
         return [];
     }
     $cfg = json_decode((string) file_get_contents($bpFile), true);
+    $out = [];
+    foreach ((array) ($cfg['breakpoints'] ?? []) as $entry) {
+        // Web UI stores {id, fn, enabled} objects; the CLI stores plain names.
+        if (is_array($entry)) {
+            $entry = ($entry['enabled'] ?? true) === false ? null : ($entry['fn'] ?? null);
+        }
+        if (is_string($entry) && $entry !== '') {
+            $out[] = $entry;
+        }
+    }
 
-    return array_values(array_filter((array) ($cfg['breakpoints'] ?? []), 'is_string'));
+    return array_values(array_unique($out));
 };
 
 $saveBp = static function (array $list) use ($bpFile): void {

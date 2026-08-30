@@ -70,10 +70,20 @@ final class Debugger
         $config = json_decode((string) @file_get_contents($file), true);
         $names  = $config['breakpoints'] ?? [];
 
+        // Entries are either "Class::method" strings (bin/filo) or objects
+        // {id, fn, enabled} written by the web UI. Only enabled `fn`
+        // entries arm; {file, line} entries can't fire in an entry-only
+        // debugger and are ignored here (the UI still lists them).
         self::$breakpoints = [];
-        foreach ((array) $names as $name) {
-            if (is_string($name) && $name !== '') {
-                self::$breakpoints[$name] = true;
+        foreach ((array) $names as $entry) {
+            if (is_array($entry)) {
+                if (($entry['enabled'] ?? true) === false) {
+                    continue;
+                }
+                $entry = $entry['fn'] ?? null;
+            }
+            if (is_string($entry) && $entry !== '') {
+                self::$breakpoints[$entry] = true;
             }
         }
 
