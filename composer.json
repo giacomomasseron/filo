@@ -1,12 +1,20 @@
 {
     "name": "giacomomasseron/filo",
-    "description": "Filo \u2014 zero-extension PHP call tracer: userland instrumentation via stream wrapper + AST rewriting",
+    "description": "Filo — zero-extension PHP call tracer: userland instrumentation via stream wrapper + AST rewriting",
     "type": "library",
     "license": "MIT",
     "require": {
         "php": "^8.1",
         "nikic/php-parser": "^5.0",
         "ext-tokenizer": "*"
+    },
+    "require-dev": {
+        "pestphp/pest": "^2.0 || ^3.0",
+        "phpunit/phpunit": "^10.0 || ^11.0"
+    },
+    "suggest": {
+        "pestphp/pest": "toRunUnder()/toCall() expectations and automatic per-test trace artifacts",
+        "phpunit/phpunit": "Filo\\Testing\\FiloAssertions trait and the TraceExtension"
     },
     "autoload": {
         "psr-4": {
@@ -16,8 +24,16 @@
             "bootstrap.php"
         ]
     },
+    "autoload-dev": {
+        "psr-4": {
+            "Filo\\Tests\\": "tests/"
+        }
+    },
     "config": {
-        "sort-packages": true
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
     },
     "bin": [
         "bin/filo"
