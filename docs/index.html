@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>filo — trace &amp; debug your PHP app. No Xdebug, no extensions.</title>
+<meta name="description" content="filo is a zero-extension call tracer for PHP. Record any request, explore it as a flamegraph and call tree, or pause it live and inspect variables at a breakpoint.">
+<meta property="og:title" content="filo — zero-extension PHP call tracer">
+<meta property="og:description" content="Trace &amp; debug your PHP app. No Xdebug, no extensions.">
+<meta property="og:image" content="shots/01-shot.png">
+<meta name="theme-color" content="#0b0d11">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Crect x='1' y='2' width='5' height='16' rx='1' fill='%23e07b6a'/%3E%3Crect x='7.5' y='7' width='5' height='11' rx='1' fill='%23e8a13d'/%3E%3Crect x='14' y='11' width='5' height='7' rx='1' fill='%237fb069'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b0d11;--bg-2:#0e1013;--panel:#12151b;--panel-2:#161b23;
+    --line:#1c212b;--line-2:#232833;--border:#2a303b;--border-hover:#3a4250;
+    --text:#e8ebf2;--body:#d7dae2;--muted:#8b93a3;--dim:#5c6470;--code:#c9cede;
+    --amber:#e8a13d;--amber-hover:#f2b45c;--coral:#e07b6a;--green:#7fb069;--blue:#6ab0f3;--purple:#b58ee0;
+    --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+    --sans:'Space Grotesk',system-ui,-apple-system,Segoe UI,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth;color-scheme:dark}
+  html,body{margin:0;padding:0;overflow-x:hidden;background:var(--bg);color:var(--body);font-family:var(--sans);font-size:16px}
+  a{color:var(--blue);text-decoration:none}a:hover{color:#93c7ff}
+  img{max-width:100%}
+  ::selection{background:rgba(232,161,61,.3)}
+  .wrap{max-width:1100px;margin:0 auto;padding:0 24px}
+  .mono{font-family:var(--mono)}
+
+  /* nav */
+  .nav{position:sticky;top:0;z-index:50;background:rgba(11,13,17,.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+  .nav .wrap{height:60px;display:flex;align-items:center;gap:28px}
+  .brand{display:flex;align-items:center;gap:10px;color:var(--text)}
+  .brand:hover{color:var(--text)}
+  .logo{display:inline-flex;align-items:flex-end;gap:2px;height:18px}
+  .logo span{width:5px;border-radius:1px;display:block}
+  .logo span:nth-child(1){height:18px;background:var(--coral)}
+  .logo span:nth-child(2){height:12px;background:var(--amber)}
+  .logo span:nth-child(3){height:7px;background:var(--green)}
+  .brand b{font-weight:700;font-size:18px;letter-spacing:-.01em}
+  .spacer{flex:1}
+  .nav-link{font-size:14px;color:var(--muted)}
+  .nav-link:hover{color:var(--text)}
+  .gh{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600;color:var(--text);border:1px solid var(--border);background:var(--panel-2);padding:7px 14px;border-radius:6px;transition:border-color .15s,background .15s}
+  .gh:hover{border-color:var(--border-hover);background:#1a2029;color:var(--text)}
+  .gh .stars{display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);font-size:12px;color:var(--amber);border-left:1px solid var(--border);padding-left:8px}
+
+  /* hero */
+  .hero{position:relative;overflow:hidden}
+  .hero::before{content:"";position:absolute;inset:0;background:radial-gradient(ellipse 60% 45% at 50% 0%,rgba(224,123,106,.10),transparent 70%);pointer-events:none}
+  .hero .wrap{padding:88px 24px 64px;text-align:center;position:relative}
+  .pill{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;color:var(--green);border:1px solid rgba(127,176,105,.35);background:rgba(127,176,105,.08);padding:5px 12px;border-radius:20px;margin-bottom:26px}
+  .pill i{width:6px;height:6px;border-radius:50%;background:var(--green);display:block}
+  h1{margin:0 0 18px;font-size:56px;line-height:1.08;font-weight:700;letter-spacing:-.03em;color:var(--text);text-wrap:balance}
+  .lead{margin:0 auto 34px;max-width:620px;font-size:18px;line-height:1.6;color:var(--muted);text-wrap:pretty}
+  .cta-stack{display:flex;flex-direction:column;align-items:center;gap:22px}
+  .btn-primary{display:inline-flex;align-items:center;gap:9px;font-size:15px;font-weight:600;color:var(--bg);background:var(--amber);padding:12px 22px;border-radius:7px;transition:background .15s}
+  .btn-primary:hover{background:var(--amber-hover);color:var(--bg)}
+  .term{width:100%;max-width:520px;text-align:left;border:1px solid var(--border);background:var(--panel);border-radius:8px;overflow:hidden}
+  .term-bar{display:flex;align-items:center;gap:8px;height:32px;padding:0 12px;background:var(--panel-2);border-bottom:1px solid var(--line-2);font-family:var(--mono);font-size:11px;color:var(--dim)}
+  .term-body{display:flex;flex-direction:column;gap:8px;padding:14px 16px;font-family:var(--mono);font-size:13.5px;line-height:1.5;color:var(--code);overflow-x:auto}
+  .term-body .p{color:var(--dim)}
+  .term-body .ok{font-size:12px;color:var(--green)}
+
+  /* screens */
+  .screens .wrap{padding:24px 24px 80px}
+  .window{position:relative;border:1px solid var(--border);border-radius:10px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.55),0 0 60px rgba(224,123,106,.07)}
+  .titlebar{display:flex;align-items:center;gap:7px;height:36px;padding:0 14px;background:var(--panel-2);border-bottom:1px solid var(--line-2)}
+  .titlebar i{width:11px;height:11px;border-radius:50%;display:block}
+  .titlebar i:nth-child(1){background:#e0655c}.titlebar i:nth-child(2){background:var(--amber)}.titlebar i:nth-child(3){background:var(--green)}
+  .titlebar span{flex:1;text-align:center;font-family:var(--mono);font-size:11.5px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .window img{display:block;width:100%;height:auto}
+  .split{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:40px;align-items:center;margin-top:72px}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.08em;color:var(--amber);margin-bottom:12px}
+  h2{margin:0 0 14px;font-size:30px;font-weight:700;letter-spacing:-.02em;color:var(--text);text-wrap:balance}
+  .split p{margin:0;font-size:15.5px;line-height:1.7;color:var(--muted);text-wrap:pretty}
+  .drawer-shot{border:1px solid var(--border);border-radius:10px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5),0 0 40px rgba(232,161,61,.06)}
+  .drawer-shot img{display:block;width:200%;max-width:200%;height:auto;margin-left:-100%}
+
+  /* features */
+  .features{border-top:1px solid var(--line);background:var(--bg-2)}
+  .features .wrap{padding:72px 24px}
+  .features h2{margin-bottom:40px}
+  .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+  .card{border:1px solid var(--line-2);background:var(--panel);border-radius:8px;padding:22px 20px;transition:border-color .15s}
+  .card:hover{border-color:var(--border-hover)}
+  .card .tag{font-family:var(--mono);font-size:13px;font-weight:700;margin-bottom:10px}
+  .card .title{font-size:16px;font-weight:600;color:var(--text);margin-bottom:8px}
+  .card .body{font-size:13.5px;line-height:1.65;color:var(--muted);text-wrap:pretty}
+
+  /* free */
+  .free{border-top:1px solid var(--line)}
+  .free .wrap{padding:72px 24px;text-align:center}
+  .free h2{margin-bottom:12px}
+  .free p{margin:0 auto 30px;max-width:520px;font-size:15.5px;line-height:1.7;color:var(--muted);text-wrap:pretty}
+  .btn-ghost{display:inline-flex;align-items:center;gap:9px;font-size:15px;font-weight:600;color:var(--text);border:1px solid var(--border);background:var(--panel-2);padding:12px 22px;border-radius:7px;transition:border-color .15s,background .15s}
+  .btn-ghost:hover{border-color:var(--border-hover);background:#1a2029;color:var(--text)}
+  .btn-ghost .star{color:var(--amber)}
+
+  /* footer */
+  footer{border-top:1px solid var(--line)}
+  footer .wrap{padding:26px 24px;display:flex;align-items:center;gap:16px;font-size:13px;color:var(--dim)}
+  footer b{font-weight:700;color:var(--muted)}
+  footer a{color:var(--muted)}footer a:hover{color:var(--text)}
+
+  @media (max-width:860px){
+    h1{font-size:40px}
+    .split{grid-template-columns:minmax(0,1fr);gap:28px}
+    .drawer-shot{max-width:420px;min-width:0}
+    .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  }
+  @media (max-width:600px){
+    .nav .wrap{gap:16px}
+    .nav-link{display:none}
+    .gh span:not(.stars){display:none}
+    .gh .stars{border-left:0;padding-left:0}
+    .hero .wrap{padding:64px 20px 48px}
+    h1{font-size:32px}
+    .lead{font-size:16px}
+    .grid{grid-template-columns:1fr}
+    footer .wrap{flex-wrap:wrap}
+  }
+  @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+
+<div class="nav">
+  <div class="wrap">
+    <a href="#top" class="brand" aria-label="filo home">
+      <span class="logo" aria-hidden="true"><span></span><span></span><span></span></span>
+      <b>filo</b>
+    </a>
+    <div class="spacer"></div>
+    <a href="#features" class="nav-link">Features</a>
+    <a href="#screens" class="nav-link">Screenshots</a>
+    <a href="https://github.com/giacomomasseron/filo" target="_blank" rel="noopener" class="gh">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+      <span>giacomomasseron/filo</span>
+      <span class="stars">&#9733; <span id="stars">Star</span></span>
+    </a>
+  </div>
+</div>
+
+<section id="top" class="hero">
+  <div class="wrap">
+    <div class="pill"><i></i>free &amp; open source &middot; MIT</div>
+    <h1>Trace &amp; debug your PHP app.<br>No Xdebug, no extensions.</h1>
+    <p class="lead">filo is a zero-extension call tracer for PHP. Record any request, then explore it as a flamegraph, a call tree with self-time hotspots - or pause it live and inspect variables at a breakpoint.</p>
+    <div class="cta-stack">
+      <a href="demo.html" target="_blank" rel="noopener" class="btn-primary">
+        <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M6.5 5.5 L10.5 8 L6.5 10.5 Z" fill="currentColor" stroke="none"/></svg>
+        View demo
+      </a>
+      <div class="term">
+        <div class="term-bar">up and running in two commands</div>
+        <div class="term-body">
+          <div><span class="p">$ </span>composer require --dev giacomomasseron/filo</div>
+          <div><span class="p">$ </span>vendor/bin/filo serve</div>
+          <div class="ok">viewer running at http://127.0.0.1:8090</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="screens" class="screens">
+  <div class="wrap">
+    <div class="window">
+      <div class="titlebar"><i></i><i></i><i></i><span>filo - GET /orders?page=1 &middot; 17.94 ms &middot; 45 events</span></div>
+      <img src="shots/01-shot.png" width="1848" height="1080" alt="filo trace view: flamegraph, call tree and top functions" loading="eager">
+    </div>
+    <div class="split">
+      <div>
+        <div class="eyebrow">LIVE DEBUGGER</div>
+        <h2>Pause a request. Look inside.</h2>
+        <p>Set breakpoints by function name or file:line. When a request hits one, it shows up in the paused panel - local variables laid out, arguments expanded - and continues on your command. No IDE, no Xdebug session dance.</p>
+      </div>
+      <div class="drawer-shot">
+        <img src="shots/02-shot.png" width="1848" height="1080" alt="filo debugger drawer: a paused request with its variables" loading="lazy">
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="features" class="features">
+  <div class="wrap">
+    <h2>Everything a tracer should do</h2>
+    <div class="grid">
+      <div class="card">
+        <div class="tag" style="color:var(--coral)">flamegraph</div>
+        <div class="title">Zoomable flamegraph</div>
+        <div class="body">Every call laid out on the timeline. Click a frame to zoom, breadcrumbs to climb back out.</div>
+      </div>
+      <div class="card">
+        <div class="tag" style="color:var(--blue)">call tree</div>
+        <div class="title">Call tree with self-time</div>
+        <div class="body">Inclusive vs. self milliseconds per call, hotspots highlighted - overlapping middleware handled correctly.</div>
+      </div>
+      <div class="card">
+        <div class="tag" style="color:var(--purple)">top functions</div>
+        <div class="title">Top functions</div>
+        <div class="body">Aggregated by self time. High call count plus high self time usually means an N+1 - filo makes it obvious.</div>
+      </div>
+      <div class="card">
+        <div class="tag" style="color:var(--amber)">debugger</div>
+        <div class="title">Live breakpoints</div>
+        <div class="body">Pause running requests by function or file:line, inspect variables in the browser, continue when ready.</div>
+      </div>
+      <div class="card">
+        <div class="tag" style="color:var(--green)">zero-extension</div>
+        <div class="title">No PECL, no recompile</div>
+        <div class="body">Pure PHP instrumentation. Works on shared hosting, containers, and anywhere you can't install extensions.</div>
+      </div>
+      <div class="card">
+        <div class="tag" style="color:var(--muted)">single file</div>
+        <div class="title">One-file UI</div>
+        <div class="body">The whole viewer ships as a single HTML file. Point it at your traces - or open it offline with sample data.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="free">
+  <div class="wrap">
+    <h2>Free, forever.</h2>
+    <p>filo is MIT-licensed and built in the open. Star the repo, file issues, send pull requests - it all helps.</p>
+    <a href="https://github.com/giacomomasseron/filo" target="_blank" rel="noopener" class="btn-ghost"><span class="star">&#9733;</span>Star on GitHub</a>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <b>filo</b>
+    <span>MIT License</span>
+    <div class="spacer"></div>
+    <a href="https://github.com/giacomomasseron/filo" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://github.com/giacomomasseron/filo/issues" target="_blank" rel="noopener">Issues</a>
+  </div>
+</footer>
+
+<script>
+  // Live star count; falls back to the static "Star" label on any failure.
+  fetch('https://api.github.com/repos/giacomomasseron/filo')
+    .then(r => r.ok ? r.json() : null)
+    .then(d => {
+      if (!d || typeof d.stargazers_count !== 'number') return;
+      const n = d.stargazers_count;
+      document.getElementById('stars').textContent =
+        n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k' : String(n);
+    })
+    .catch(() => {});
+</script>
+</body>
+</html>
