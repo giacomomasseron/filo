@@ -131,13 +131,14 @@ expect(fn () => ...)->toCall('App\Repo::find')->atMost(1);
 expect(fn () => ...)->toCall('App\Repo::find')->atLeast(1)->atMost(3);
 expect(fn () => ...)->toCall('App\Repo::find')->times(2);
 expect(fn () => ...)->toCallOnce('App\Repo::find');
-expect(fn () => ...)->not->toCall('App\Repo::find');  // asserts 0 calls
+expect(fn () => ...)->toNotCall('App\Repo::find');    // asserts 0 calls
 ```
 
 `toCall()` captures once and returns `Filo\Testing\Pest\CallExpectation`
-(`atMost`, `atLeast`, `times`). Every method accepts a ready `Trace` in
-place of the closure (`expect($trace)->toRunUnder(10)`) so one capture can
-back several assertions.
+(`atMost`, `atLeast`, `times`). Pest 3 exposes no negation flag to
+`extend()`, so negation is a separate expectation. Every method accepts a
+ready `Trace` in place of the closure (`expect($trace)->toRunUnder(10)`)
+so one capture can back several assertions.
 
 ## Section 3 — Artifacts & lifecycle
 

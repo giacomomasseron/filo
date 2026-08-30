@@ -92,9 +92,6 @@ drift inside instrumented files (pretty printer) — trace line numbers are
 correct (baked from original AST); format-preserving printer is the v3 fix.
 Arrow functions, native functions, eval'd code = caller self-time.
 
-- `proc_open()` with `['file', path, mode]` descriptors fails under the wrapper — use pipes.
-- `file_put_contents(..., LOCK_EX)` through the wrapper warns "Exclusive locks are not supported for this stream" (seen from Pest's result cache) — harmless, fix pending.
-
 ## Roadmap candidates (phase 3+)
 
 1. opcache coexistence (`opcache_invalidate` on toggle).
@@ -105,6 +102,8 @@ Arrow functions, native functions, eval'd code = caller self-time.
    (served automatically, flat dir, extension whitelist in server/index.php).
    Never serve static files via `return false` in the php -S router — it
    resolves against project root and exposes source.
+6. Unit tests for VarExporter, HookVisitor output snapshots, Debugger
+   timeout path (descoped from the test-integration plan).
 
 ## Conventions
 
