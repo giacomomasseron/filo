@@ -63,6 +63,8 @@ require_once __DIR__ . '/src/Testing/Trace.php';
 require_once __DIR__ . '/src/Testing/Recorder.php';
 require_once __DIR__ . '/src/Testing/ExpectationFailed.php';
 require_once __DIR__ . '/src/Testing/Assert.php';
+require_once __DIR__ . '/src/Testing/Traced.php';
+require_once __DIR__ . '/src/Testing/PHPUnit/TestArtifact.php';
 require_once __DIR__ . '/src/Tracer.php';
 
 \Filo\Tracer::start();

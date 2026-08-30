@@ -14,4 +14,7 @@
     <groups>
         <exclude><group>fixture</group></exclude>
     </groups>
+    <extensions>
+        <bootstrap class="Filo\Testing\PHPUnit\TraceExtension"/>
+    </extensions>
 </phpunit>
