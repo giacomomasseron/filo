@@ -58,6 +58,8 @@ require_once __DIR__ . '/src/Debugger.php';
 require_once __DIR__ . '/src/Instrumenter.php';
 require_once __DIR__ . '/src/HookVisitor.php';
 require_once __DIR__ . '/src/IncludeStreamWrapper.php';
+require_once __DIR__ . '/src/Testing/FiloNotEnabledException.php';
+require_once __DIR__ . '/src/Testing/Trace.php';
 require_once __DIR__ . '/src/Tracer.php';
 
 \Filo\Tracer::start();
