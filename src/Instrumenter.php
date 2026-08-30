@@ -13,13 +13,13 @@ use Throwable;
  * Source-to-source transform: inject Collector::enter()/leave() hooks
  * into every function, method and closure body.
  *
- * Returns null on any failure - the wrapper then serves the ORIGINAL
+ * Returns null on any failure — the wrapper then serves the ORIGINAL
  * file, so a parse error in exotic code can never take the app down.
  */
 final class Instrumenter
 {
     /** Part of the cache key: bump when the transform changes. */
-    public const VERSION = '1';
+    public const VERSION = '3';
 
     public static function instrument(string $source): ?string
     {

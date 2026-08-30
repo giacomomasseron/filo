@@ -6,7 +6,7 @@ declare(strict_types=1);
  * Tracer bootstrap.
  *
  * Loaded automatically by Composer ("autoload.files") the moment
- * vendor/autoload.php is included - before any application class
+ * vendor/autoload.php is included — before any application class
  * is autoloaded, hence before any application file passes through
  * the stream wrapper. (Option B: files loaded *before* the autoloader,
  * e.g. the front controller itself, are not instrumented.)
@@ -20,16 +20,16 @@ declare(strict_types=1);
  *      Checked per request, so toggling is instant.
  *
  *   2. Env var FILO_ENABLED=1 (for CI, docker-compose, CLI one-offs).
- *      Note: a Laravel `.env` entry will NOT work - phpdotenv runs
+ *      Note: a Laravel `.env` entry will NOT work — phpdotenv runs
  *      after this bootstrap. Use the marker file instead.
  */
 $tracerEnabled = filter_var($_SERVER['FILO_ENABLED'] ?? getenv('FILO_ENABLED') ?: '0', FILTER_VALIDATE_BOOL);
 
 if (!$tracerEnabled) {
-    // Installed path: vendor/giacomomasseron/filo -> two dirs up = project root.
-    // getcwd() covers path-repository setups and CLI runs from the root.
-    $tracerEnabled = is_file(dirname(__DIR__, 2) . '/.filo-on')
-        || is_file(getcwd() . '/.filo-on');
+    // Tracer.php is dependency-free; loading it here (before the wrapper
+    // exists) is safe and keeps root discovery in ONE place.
+    require_once __DIR__ . '/src/Tracer.php';
+    $tracerEnabled = is_file(\Filo\Tracer::findProjectRoot() . '/.filo-on');
 }
 
 if (!$tracerEnabled) {
@@ -53,6 +53,8 @@ define('FILO_BOOTSTRAPPED', true);
  * before interception starts.
  */
 require_once __DIR__ . '/src/Collector.php';
+require_once __DIR__ . '/src/VarExporter.php';
+require_once __DIR__ . '/src/Debugger.php';
 require_once __DIR__ . '/src/Instrumenter.php';
 require_once __DIR__ . '/src/HookVisitor.php';
 require_once __DIR__ . '/src/IncludeStreamWrapper.php';

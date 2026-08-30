@@ -1,0 +1,98 @@
+# CLAUDE.md — filo
+
+Zero-extension PHP call tracer (Xdebug alternative). Userland instrumentation:
+a `file://` stream wrapper intercepts every include, rewrites the AST
+(nikic/php-parser ^5) to inject timing/breakpoint hooks, and serves the
+modified source from memory. Original files are NEVER touched; instrumented
+copies live only in a cache. Composer package `giacomomasseron/filo`,
+namespace `Filo\`, PHP ^8.1. "filo" = Italian for thread (Ariadne's thread).
+
+## Status: written but NEVER EXECUTED
+
+This codebase was authored in an environment without a PHP runtime.
+It compiles in the author's head, not in CI. Before any new feature,
+run the verification pass below and fix what breaks.
+
+## Verification pass (do this first)
+
+1. `composer install`
+2. `php -l` every file in `src/`, `bootstrap.php`, `bin/filo`, `server/index.php`
+3. `FILO_ENABLED=1 php -d opcache.enable_cli=0 examples/smoke.php` — must print 3 PASS lines
+4. Known-risk spots, in order of suspicion:
+   - php-parser v5 API names in `src/HookVisitor.php` (`ArrayItem` moved out of
+     `Expr\` in v5; `Int_` was `LNumber` in v4) and `Instrumenter.php`
+     (`createForHostVersion()`)
+   - `STREAM_OPEN_FOR_INCLUDE` (value 128) actually firing in
+     `IncludeStreamWrapper::stream_open()` on the target SAPI
+   - `stream_stat()` on the `php://memory` handle serving instrumented includes
+   - `If_` node construction args in `HookVisitor` (named-ish `['stmts' => …]` subnode array)
+5. Breakpoints end-to-end: `examples/break-demo.php` (two terminals, see its header)
+6. `vendor/bin/filo serve` — the inline JS in `server/index.php` is untested;
+   verify trace list renders, call tree expands, continue button releases a pause
+
+## Architecture invariants (do not break these)
+
+- **Wrapper re-entrancy**: every real filesystem touch inside
+  `IncludeStreamWrapper` MUST go through `self::native()` (restore real
+  wrapper → op → re-hook). A missed one = infinite recursion.
+- **Eager loading**: every `Filo\` class is `require_once`'d in
+  `bootstrap.php` BEFORE the wrapper registers. New src file ⇒ new require
+  there, or autoloading it recurses through the wrapper.
+- **`$openedPath` stays unset** for instrumented includes so `__FILE__`/
+  `__DIR__` keep pointing at the real source, never the cache.
+- **Fail open**: any parse/instrumentation failure ⇒ serve the ORIGINAL file.
+  Filo must never be able to take an app down.
+- **Cache key** = wrapper VERSION + Instrumenter VERSION + realpath + mtime.
+  Any change to the injected code ⇒ bump `Instrumenter::VERSION`.
+- **Self-exclusion**: the package dir and cache dir are always excluded from
+  instrumentation (see `Tracer::start`). Test fixtures must live OUTSIDE the
+  repo (temp dir) — see `examples/smoke.php`.
+- **Pause time is excluded from traces** via `Collector::excludePause()`
+  (epoch shift). Don't "fix" timings by touching individual events.
+- **Root-path arithmetic**: `bootstrap.php` sits at package root ⇒ project
+  root is `dirname(__DIR__, 3)`; `src/` files ⇒ `dirname(__DIR__, 4)`.
+  This was already gotten wrong once.
+
+## Decisions already made (don't relitigate casually)
+
+- Framework-agnostic core; Laravel/Symfony adapters later as thin packages.
+- Bootstrap via Composer `autoload.files` (accepted cost: front controller
+  itself isn't instrumented; `auto_prepend_file` documented as full-coverage mode).
+- Zero-command UX: `.filo-on` marker file toggles tracing; env vars are the
+  CI alternative. A Laravel `.env` entry cannot work (loads after bootstrap).
+- Breakpoints are ENTRY-only, once per request per breakpoint,
+  inspect-and-continue via files (poll for `<id>.continue`), auto-timeout
+  `FILO_BREAK_TIMEOUT` (120s). No stepping, no eval — Xdebug's territory.
+- Web viewer: `filo serve` (php -S, localhost-only). `server/index.php` =
+  JSON API (contract in its header comment) + placeholder HTML. A designed
+  UI (being produced in Claude Design) will replace the HTML, never the API.
+- Trace format v1: flat events `{i,p,fn,file,line,s,e,m}`, ns offsets;
+  see README "Trace format". `examples/sample-trace.json` is the fixture.
+
+## Known limitations (documented, not bugs)
+
+Opcache must be off while tracing (and can serve stale instrumented code —
+`opcache_invalidate()` on state change is a wanted v3 fix). Line numbers
+drift inside instrumented files (pretty printer) — trace line numbers are
+correct (baked from original AST); format-preserving printer is the v3 fix.
+Arrow functions, native functions, eval'd code = caller self-time.
+
+## Roadmap candidates (phase 3+)
+
+1. Real test suite (PHPUnit): wrapper proxy ops, visitor output snapshots,
+   collector linkage, Debugger timeout path. CI matrix PHP 8.1–8.4.
+2. opcache coexistence (`opcache_invalidate` on toggle).
+3. Format-preserving printer for exact line numbers.
+4. Long-running runtime adapters (Octane/RoadRunner: `Collector::cycle()`).
+5. Sampling mode (instrument N% of requests) for staging.
+6. Designed web UI from Claude Design: drop exported files into server/ui/
+   (served automatically, flat dir, extension whitelist in server/index.php).
+   Never serve static files via `return false` in the php -S router — it
+   resolves against project root and exposes source.
+
+## Conventions
+
+PHP 8.1+ syntax, `declare(strict_types=1)` everywhere, final classes,
+static hot paths in `Collector`/`Debugger` (no DI — bootstrap runs before
+any container exists). Hot-path code (enter/leave/hit) must stay
+allocation-light; measure before adding anything there.

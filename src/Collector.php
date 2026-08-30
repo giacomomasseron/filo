@@ -90,6 +90,18 @@ final class Collector
     }
 
     /**
+     * Called by Debugger after a breakpoint pause. Shifting the epoch
+     * forward makes every SUBSEQUENT timestamp smaller by the paused
+     * duration: the paused frame and all open ancestors shrink by
+     * exactly the pause, while already-closed events are untouched.
+     * Net effect: breakpoints leave no mark on the timeline.
+     */
+    public static function excludePause(int $ns): void
+    {
+        self::$t0 += $ns;
+    }
+
+    /**
      * For long-running runtimes (Octane, RoadRunner, FrankenPHP worker):
      * call at the end of each request instead of relying on shutdown.
      */
@@ -97,6 +109,7 @@ final class Collector
     {
         self::flush($outputDir);
         self::begin();
+        Debugger::cycle();
     }
 
     public static function flush(string $outputDir): void

@@ -1,0 +1,140 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/*
+ * filo — breakpoint control CLI. Self-contained: no autoload needed.
+ *
+ *   filo breaks                      list configured breakpoints
+ *   filo break "App\Foo::bar"        add a breakpoint
+ *   filo unbreak "App\Foo::bar"      remove a breakpoint
+ *   filo pending                     list requests currently paused
+ *   filo show <id>                   dump a paused request's variables
+ *   filo continue <id>               release one paused request
+ *   filo serve [port]                start the local web viewer (default 8090)
+ *   filo continue --all              release every paused request
+ *
+ * Project root is resolved by Tracer::findProjectRoot() (FILO_PROJECT_ROOT
+ * overrides). Honors FILO_OUTPUT_DIR (default <tmp>/filo-traces).
+ */
+
+require_once dirname(__DIR__) . '/src/Tracer.php';
+
+$root      = \Filo\Tracer::findProjectRoot();
+$bpFile    = $root . '/.filo/breakpoints.json';
+$outputDir = getenv('FILO_OUTPUT_DIR') ?: sys_get_temp_dir() . '/filo-traces';
+$breaksDir = rtrim($outputDir, '/') . '/breaks';
+
+$cmd = $argv[1] ?? 'help';
+$arg = $argv[2] ?? null;
+
+$die = static function (string $msg): never {
+    fwrite(STDERR, $msg);
+    exit(1);
+};
+
+$loadBp = static function () use ($bpFile): array {
+    if (!is_file($bpFile)) {
+        return [];
+    }
+    $cfg = json_decode((string) file_get_contents($bpFile), true);
+
+    return array_values(array_filter((array) ($cfg['breakpoints'] ?? []), 'is_string'));
+};
+
+$saveBp = static function (array $list) use ($bpFile): void {
+    if (!is_dir(dirname($bpFile))) {
+        mkdir(dirname($bpFile), 0777, true);
+    }
+    file_put_contents($bpFile, json_encode(
+        ['breakpoints' => array_values(array_unique($list))],
+        JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES,
+    ) . "\n");
+};
+
+$pending = static function () use ($breaksDir): array {
+    $out = [];
+    foreach (glob($breaksDir . '/*.json') ?: [] as $f) {
+        $snap = json_decode((string) file_get_contents($f), true);
+        if (is_array($snap) && isset($snap['id'])) {
+            $out[$snap['id']] = $snap;
+        }
+    }
+    ksort($out);
+
+    return $out;
+};
+
+switch ($cmd) {
+    case 'breaks':
+        $list = $loadBp();
+        echo $list === [] ? "no breakpoints configured ({$bpFile})\n" : implode("\n", $list) . "\n";
+        break;
+
+    case 'break':
+        $arg !== null || $die("usage: filo break \"App\\Foo::bar\"\n");
+        $saveBp([...$loadBp(), $arg]);
+        echo "breakpoint added: {$arg}\n";
+        break;
+
+    case 'unbreak':
+        $arg !== null || $die("usage: filo unbreak \"App\\Foo::bar\"\n");
+        $saveBp(array_filter($loadBp(), static fn (string $b): bool => $b !== $arg));
+        echo "breakpoint removed: {$arg}\n";
+        break;
+
+    case 'pending':
+        $snaps = $pending();
+        if ($snaps === []) {
+            echo "no paused requests\n";
+            break;
+        }
+        foreach ($snaps as $s) {
+            printf("%-14s %-45s %s\n", $s['id'], $s['fn'], $s['uri'] ?? '');
+        }
+        break;
+
+    case 'show':
+        $arg !== null || $die("usage: filo show <id>\n");
+        $snaps = $pending();
+        isset($snaps[$arg]) || $die("no paused request with id {$arg}\n");
+        $s = $snaps[$arg];
+        printf("%s\n  at %s:%d\n  request: %s\n  vars:\n", $s['fn'], $s['file'], $s['line'], $s['uri'] ?? '-');
+        echo json_encode($s['vars'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), "\n";
+        break;
+
+    case 'continue':
+        if ($arg === '--all') {
+            is_dir($breaksDir) || mkdir($breaksDir, 0777, true);
+            // Unique token per release — Debugger compares content, not mtime.
+            file_put_contents($breaksDir . '/continue-all', uniqid('', true));
+            echo "released all paused requests\n";
+            break;
+        }
+        $arg !== null || $die("usage: filo continue <id>|--all\n");
+        is_dir($breaksDir) || mkdir($breaksDir, 0777, true);
+        touch($breaksDir . '/' . basename($arg) . '.continue');
+        echo "released {$arg}\n";
+        break;
+
+    case 'serve':
+        $port   = is_numeric($arg) ? (int) $arg : 8090;
+        $server = dirname(__DIR__) . '/server/index.php';
+        putenv('FILO_PROJECT_ROOT=' . $root);
+        putenv('FILO_OUTPUT_DIR=' . $outputDir);
+        echo "filo viewer on http://127.0.0.1:{$port}  (Ctrl-C to stop)\n";
+        passthru(sprintf(
+            '%s -S 127.0.0.1:%d %s',
+            escapeshellarg(PHP_BINARY),
+            $port,
+            escapeshellarg($server),
+        ));
+        break;
+
+    default:
+        echo "filo — breakpoint control\n\n";
+        echo "  filo breaks | break <fn> | unbreak <fn>\n";
+        echo "  filo pending | show <id> | continue <id>|--all\n  filo serve [port]\n";
+        break;
+}

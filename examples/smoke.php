@@ -63,9 +63,9 @@ $fail = static function (string $msg): never {
 };
 
 $result === 42
-    || $fail('fixture returned wrong value - instrumented code changed behavior');
+    || $fail('fixture returned wrong value — instrumented code changed behavior');
 isset($byFn['filo_smoke_outer'], $byFn['filo_smoke_inner'])
-    || $fail('expected events missing - wrapper did not intercept the include (check STREAM_OPEN_FOR_INCLUDE fires on this SAPI)');
+    || $fail('expected events missing — wrapper did not intercept the include (check STREAM_OPEN_FOR_INCLUDE fires on this SAPI)');
 $byFn['filo_smoke_inner']['p'] === $byFn['filo_smoke_outer']['i']
     || $fail('parent linkage wrong');
 
