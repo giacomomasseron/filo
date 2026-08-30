@@ -44,13 +44,18 @@ run the verification pass below and fix what breaks.
   Filo must never be able to take an app down.
 - **Cache key** = wrapper VERSION + Instrumenter VERSION + realpath + mtime.
   Any change to the injected code ⇒ bump `Instrumenter::VERSION`.
+- **Traces always live in `<project>/.filo/traces`** (breaks in `…/breaks`),
+  via `Tracer::outputDir()` — the only place that knows the path. Not
+  configurable by design; `.filo/` must be gitignored.
 - **Self-exclusion**: the package dir and cache dir are always excluded from
   instrumentation (see `Tracer::start`). Test fixtures must live OUTSIDE the
   repo (temp dir) — see `examples/smoke.php`.
 - **Pause time is excluded from traces** via `Collector::excludePause()`
   (epoch shift). Don't "fix" timings by touching individual events.
 - **Root-path arithmetic**: `bootstrap.php` sits at package root ⇒ project
-  root is `dirname(__DIR__, 3)`; `src/` files ⇒ `dirname(__DIR__, 4)`.
+  root is `dirname(__DIR__, 3)`; `src/` files ⇒ `dirname(__DIR__, 4)`. When that
+  fails (cwd=public/, path-repo symlink), `findProjectRoot()` walks up
+  from SCRIPT_FILENAME dir and cwd until it finds composer.json or .filo/.
   This was already gotten wrong once.
 
 ## Decisions already made (don't relitigate casually)

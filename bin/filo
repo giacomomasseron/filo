@@ -16,14 +16,14 @@ declare(strict_types=1);
  *   filo continue --all              release every paused request
  *
  * Project root is resolved by Tracer::findProjectRoot() (FILO_PROJECT_ROOT
- * overrides). Honors FILO_OUTPUT_DIR (default <tmp>/filo-traces).
+ * overrides). Traces are always read from <project>/.filo/traces.
  */
 
 require_once dirname(__DIR__) . '/src/Tracer.php';
 
 $root      = \Filo\Tracer::findProjectRoot();
 $bpFile    = $root . '/.filo/breakpoints.json';
-$outputDir = getenv('FILO_OUTPUT_DIR') ?: sys_get_temp_dir() . '/filo-traces';
+$outputDir = \Filo\Tracer::outputDir($root);
 $breaksDir = rtrim($outputDir, '/') . '/breaks';
 
 $cmd = $argv[1] ?? 'help';
@@ -122,7 +122,6 @@ switch ($cmd) {
         $port   = is_numeric($arg) ? (int) $arg : 8090;
         $server = dirname(__DIR__) . '/server/index.php';
         putenv('FILO_PROJECT_ROOT=' . $root);
-        putenv('FILO_OUTPUT_DIR=' . $outputDir);
         echo "filo viewer on http://127.0.0.1:{$port}  (Ctrl-C to stop)\n";
         passthru(sprintf(
             '%s -S 127.0.0.1:%d %s',

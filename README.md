@@ -22,8 +22,8 @@ Apache, `artisan serve`, or plain CLI scripts.
 
 **Enable it:** create an empty `.filo-on` file in your project root
 (from your IDE file tree is fine). Browse your app as usual; every
-request writes a JSON trace to `FILO_OUTPUT_DIR`
-(default: `<tmp>/filo-traces`). Delete the file to stop tracing.
+request writes a JSON trace to `.filo/traces/` inside your project
+(add `.filo/` to your `.gitignore`). Delete the file to stop tracing.
 The check is per-request, so toggling is instant — no restarts.
 
 **Alternative** (CI, docker-compose, one-off CLI runs): set the env var
@@ -43,7 +43,6 @@ off out of the box).
 |---------------------|-----------------------|-------------------------------------------|
 | `FILO_ENABLED`    | `0`                   | Master switch                             |
 | `FILO_CACHE_DIR`  | `<tmp>/filo-cache`  | Instrumented-file cache                   |
-| `FILO_OUTPUT_DIR` | `<tmp>/filo-traces` | JSON trace output                         |
 | `FILO_EXCLUDE`    | `vendor`              | Comma-separated path substrings to skip   |
 
 ## Trace format (v1)

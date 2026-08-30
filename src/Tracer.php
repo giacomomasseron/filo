@@ -11,7 +11,7 @@ namespace Filo;
  * Env vars:
  *   FILO_ENABLED=1                     master switch (checked in bootstrap.php)
  *   FILO_CACHE_DIR=/tmp/filo-cache     instrumented-file cache
- *   FILO_OUTPUT_DIR=/tmp/filo-traces   where JSON traces are written
+ *   (traces are ALWAYS written to <project>/.filo/traces — not configurable)
  *   FILO_EXCLUDE=vendor,storage        comma-separated path substrings to skip
  *   FILO_BREAK_TIMEOUT=120             seconds before a paused breakpoint auto-continues
  *   FILO_PROJECT_ROOT=/app             override project-root discovery (see findProjectRoot)
@@ -37,7 +37,7 @@ final class Tracer
 
         self::$projectRoot = self::findProjectRoot();
         self::$cacheDir    = self::env('FILO_CACHE_DIR', sys_get_temp_dir() . '/filo-cache');
-        self::$outputDir   = self::env('FILO_OUTPUT_DIR', sys_get_temp_dir() . '/filo-traces');
+        self::$outputDir   = self::outputDir(self::$projectRoot);
         self::$breaksDir   = self::$outputDir . '/breaks';
 
         $exclude = array_filter(array_map('trim', explode(',', self::env('FILO_EXCLUDE', 'vendor'))));
@@ -80,8 +80,14 @@ final class Tracer
      *
      * Order: explicit FILO_PROJECT_ROOT env; the installed layout
      * (<root>/vendor/giacomomasseron/filo/src -> 4 up) only if it looks
-     * like a project (has .filo/ or composer.json); then getcwd() with
-     * the same probe (path-repository / package-dev layouts); else cwd.
+     * like a project (has .filo/ or composer.json); then walk UP from the
+     * running script's directory and from getcwd() until a directory
+     * looks like a project; else cwd.
+     *
+     * The walk-up matters for two common layouts: `artisan serve` (and
+     * most web servers) run PHP with cwd = public/, and a Composer
+     * path-repository symlink makes __DIR__ resolve outside the project,
+     * so neither fixed candidate hits the real root.
      */
     public static function findProjectRoot(): string
     {
@@ -90,13 +96,46 @@ final class Tracer
             return rtrim($env, '/');
         }
 
-        foreach ([dirname(__DIR__, 4), (string) getcwd()] as $candidate) {
-            if ($candidate !== '' && (is_dir($candidate . '/.filo') || is_file($candidate . '/composer.json'))) {
-                return $candidate;
+        $installed = dirname(__DIR__, 4);
+        if (self::looksLikeProject($installed)) {
+            return $installed;
+        }
+
+        $script = (string) ($_SERVER['SCRIPT_FILENAME'] ?? '');
+        $starts = array_filter([
+            $script !== '' ? dirname($script) : '',
+            (string) getcwd(),
+        ]);
+
+        foreach ($starts as $dir) {
+            while ($dir !== '' && $dir !== '.') {
+                if (self::looksLikeProject($dir)) {
+                    return $dir;
+                }
+                $parent = dirname($dir);
+                if ($parent === $dir) {
+                    break;
+                }
+                $dir = $parent;
             }
         }
 
         return (string) getcwd();
+    }
+
+    /**
+     * Traces always live inside the project: <root>/.filo/traces
+     * (breaks/ beneath it). Shared by Tracer, bin/filo and the viewer so
+     * they can never disagree about where the JSON is.
+     */
+    public static function outputDir(?string $projectRoot = null): string
+    {
+        return ($projectRoot ?? self::findProjectRoot()) . '/.filo/traces';
+    }
+
+    private static function looksLikeProject(string $dir): bool
+    {
+        return $dir !== '' && (is_dir($dir . '/.filo') || is_file($dir . '/composer.json'));
     }
 
     private static function env(string $key, string $default): string

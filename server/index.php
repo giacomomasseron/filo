@@ -25,10 +25,11 @@ declare(strict_types=1);
  * rewrite breakpoints via a simple cross-origin request.
  */
 
-$outputDir = getenv('FILO_OUTPUT_DIR') ?: sys_get_temp_dir() . '/filo-traces';
-$breaksDir = rtrim($outputDir, '/') . '/breaks';
 require_once dirname(__DIR__) . '/src/Tracer.php';
-$bpFile    = \Filo\Tracer::findProjectRoot() . '/.filo/breakpoints.json';
+$root      = \Filo\Tracer::findProjectRoot();
+$outputDir = \Filo\Tracer::outputDir($root);
+$breaksDir = $outputDir . '/breaks';
+$bpFile    = $root . '/.filo/breakpoints.json';
 
 $path   = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
