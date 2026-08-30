@@ -24,6 +24,9 @@ final class IncludeStreamWrapper
     /** Not defined in every SAPI/version; value is stable. */
     private const OPEN_FOR_INCLUDE = 128; // STREAM_OPEN_FOR_INCLUDE
 
+    /** Not exposed to userland; value is stable. */
+    private const WILL_CAST = 32; // STREAM_WILL_CAST
+
     /** Bump to bust the instrumentation cache when the injector changes. */
     public const VERSION = '1';
 
@@ -32,6 +35,21 @@ final class IncludeStreamWrapper
 
     /** @var resource|null directory handle for dir_* ops */
     private $dirHandle;
+
+    /** Opener announced STREAM_WILL_CAST (proc_open's ['file', ...] descriptors). */
+    private bool $willCast = false;
+
+    /** stream_cast() handed the raw handle out. */
+    private bool $casted = false;
+
+    /**
+     * Handles cast out with CAST_RELEASE: the caller (proc_open) keeps using
+     * the fd after freeing the wrapper, so we must NOT fclose them — and must
+     * keep a reference so the GC doesn't close them either.
+     *
+     * @var array<int, resource>
+     */
+    private static array $castedHandles = [];
 
     /** @var resource|null set by PHP when a context is passed */
     public $context;
@@ -72,7 +90,8 @@ final class IncludeStreamWrapper
 
     public function stream_open(string $path, string $mode, int $options, ?string &$openedPath): bool
     {
-        $forInclude = (bool) ($options & self::OPEN_FOR_INCLUDE);
+        $forInclude     = (bool) ($options & self::OPEN_FOR_INCLUDE);
+        $this->willCast = (bool) ($options & self::WILL_CAST);
 
         if ($forInclude && self::eligible($path)) {
             $code = self::instrumentedCode($path);
@@ -128,7 +147,12 @@ final class IncludeStreamWrapper
     public function stream_close(): void
     {
         if (is_resource($this->handle)) {
-            fclose($this->handle);
+            if ($this->willCast && $this->casted) {
+                // Cast out and released: proc_open still owns this fd.
+                self::$castedHandles[] = $this->handle;
+            } else {
+                fclose($this->handle);
+            }
         }
         $this->handle = null;
     }
@@ -140,6 +164,12 @@ final class IncludeStreamWrapper
 
     public function stream_seek(int $offset, int $whence = SEEK_SET): bool
     {
+        // Non-seekable targets (/dev/null, pipes) are legitimate here: PHP
+        // seeks while casting a stream out. Report failure, don't warn.
+        if (!(stream_get_meta_data($this->handle)['seekable'] ?? false)) {
+            return false;
+        }
+
         return fseek($this->handle, $offset, $whence) === 0;
     }
 
@@ -191,7 +221,12 @@ final class IncludeStreamWrapper
 
     public function stream_cast(int $castAs)
     {
-        return $this->handle ?: false;
+        if (!is_resource($this->handle)) {
+            return false;
+        }
+        $this->casted = true;
+
+        return $this->handle;
     }
 
     // ---------------------------------------------------------------

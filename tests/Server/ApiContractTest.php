@@ -11,7 +11,6 @@ final class ApiServer
     public static $proc = null;
     public static string $base = '';
     public static string $root = '';
-    public static array $pipes = [];
 
     public static function start(): void
     {
@@ -24,15 +23,11 @@ final class ApiServer
         $env = array_merge(getenv(), ['FILO_PROJECT_ROOT' => self::$root]);
         self::$proc = proc_open(
             [PHP_BINARY, '-S', "127.0.0.1:$port", dirname(__DIR__, 2) . '/server/index.php'],
-            [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+            [1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']],
             $pipes,
             null,
             $env,
         );
-        self::$pipes = $pipes;
-        stream_set_blocking(self::$pipes[1], false);
-        stream_set_blocking(self::$pipes[2], false);
-
         for ($i = 0; $i < 50; $i++) {
             usleep(100_000);
             if (@file_get_contents(self::$base . '/api/breakpoints') !== false) {
@@ -45,11 +40,6 @@ final class ApiServer
     public static function stop(): void
     {
         if (self::$proc) {
-            foreach (self::$pipes as $pipe) {
-                stream_get_contents($pipe);
-                fclose($pipe);
-            }
-            self::$pipes = [];
             proc_terminate(self::$proc);
             proc_close(self::$proc);
         }
@@ -58,10 +48,6 @@ final class ApiServer
     /** @return array{int, mixed} [status, decoded body] */
     public static function call(string $method, string $path, ?string $body = null, array $headers = []): array
     {
-        foreach (self::$pipes as $pipe) {
-            stream_get_contents($pipe);
-        }
-
         $ctx = stream_context_create(['http' => [
             'method'        => $method,
             'header'        => implode("\r\n", $headers),
