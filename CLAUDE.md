@@ -59,6 +59,9 @@ namespace `Filo\`, PHP ^8.1. "filo" = Italian for thread (Ariadne's thread).
   required in `bootstrap.php`; classes that reference PHPUnit/Pest
   (FiloAssertions, PHPUnit/TraceExtension, Pest/*) are autoloaded only.
   `Collector::mark()/since()` are the only collector additions — hot path untouched.
+  The Pest plugin `Filo\Testing\Pest\Plugin` is declared in composer.json
+  `extra.pest.plugins` and auto-discovered by Pest (root package included) —
+  no manual `require` in tests/Pest.php.
 - **Own test suite**: `FILO_ENABLED=1 vendor/bin/pest`. Instrumented fixtures
   are written to a temp dir by `tests/Support/TempProject`. The `fixture`
   group is excluded from normal runs and executed by
