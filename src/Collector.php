@@ -102,6 +102,47 @@ final class Collector
     }
 
     /**
+     * Position marker for scoped captures (Filo\Testing\Recorder).
+     * Not on the hot path.
+     */
+    public static function mark(): int
+    {
+        return self::$nextId;
+    }
+
+    /**
+     * Events recorded since mark(), as a self-contained forest: frames
+     * still open are closed at "now" and parents that predate the mark
+     * become roots (-1). The collector itself is not mutated.
+     *
+     * @return list<array{i:int,p:int,fn:string,file:string,line:int,s:int,e:int,m:int}>
+     */
+    public static function since(int $mark): array
+    {
+        if ($mark >= self::$nextId) {
+            return [];
+        }
+
+        $now = hrtime(true) - self::$t0;
+        $out = [];
+        for ($i = max(0, $mark); $i < self::$nextId; $i++) {
+            if (!isset(self::$events[$i])) {
+                continue; // capped
+            }
+            $row = self::$events[$i];
+            if ($row['e'] === -1) {
+                $row['e'] = $now;
+            }
+            if ($row['p'] < $mark) {
+                $row['p'] = -1;
+            }
+            $out[] = $row;
+        }
+
+        return $out;
+    }
+
+    /**
      * For long-running runtimes (Octane, RoadRunner, FrankenPHP worker):
      * call at the end of each request instead of relying on shutdown.
      */

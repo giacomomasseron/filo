@@ -18,7 +18,8 @@ namespace Filo;
  */
 final class Tracer
 {
-    private static bool $started = false;
+    private static bool $started      = false;
+    private static bool $suppressFlush = false;
 
     public static string $cacheDir;
     public static string $outputDir;
@@ -67,10 +68,21 @@ final class Tracer
         // (Octane, RoadRunner, FrankenPHP worker mode) should instead call
         // Collector::cycle() at their per-request boundary — see README.
         register_shutdown_function(static function (): void {
-            Collector::flush(self::$outputDir);
+            if (!self::$suppressFlush) {
+                Collector::flush(self::$outputDir);
+            }
         });
 
         IncludeStreamWrapper::register();
+    }
+
+    /**
+     * Test runners write one trace per test (Filo\Testing\PHPUnit\TraceExtension)
+     * and must not also get a giant process-wide trace at exit.
+     */
+    public static function suppressShutdownFlush(): void
+    {
+        self::$suppressFlush = true;
     }
 
     /**
