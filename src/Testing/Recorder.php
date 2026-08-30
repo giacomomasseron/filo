@@ -23,19 +23,21 @@ final class Recorder
     {
         $enabled = self::enabled();
         $mark    = $enabled ? Collector::mark() : 0;
-        $start   = hrtime(true);
+        // Collector::now() rides the collector epoch, which excludePause()
+        // shifts: breakpoint pauses are absorbed instead of measured.
+        $start   = $enabled ? Collector::now() : hrtime(true);
         $events  = [];
         $result  = null;
 
         try {
             $result = $fn();
         } finally {
-            $wall = hrtime(true) - $start;
+            $wall = ($enabled ? Collector::now() : hrtime(true)) - $start;
             if ($enabled) {
                 $events = Collector::since($mark);
             }
         }
 
-        return new Trace($events, $wall, $result, $enabled);
+        return new Trace($events, $wall, $result, $enabled, $enabled && Collector::capped());
     }
 }

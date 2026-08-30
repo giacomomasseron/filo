@@ -111,6 +111,25 @@ final class Collector
     }
 
     /**
+     * Nanoseconds since the collector epoch — the same clock the event
+     * timestamps use, so excludePause() shifts it too and paused time
+     * never lands in a measured duration. Not on the hot path.
+     */
+    public static function now(): int
+    {
+        return hrtime(true) - self::$t0;
+    }
+
+    /**
+     * True once the event cap was hit: events past it were dropped, so
+     * call counts are no longer trustworthy. Not on the hot path.
+     */
+    public static function capped(): bool
+    {
+        return self::$capped;
+    }
+
+    /**
      * Events recorded since mark(), as a self-contained forest: frames
      * still open are closed at "now" and parents that predate the mark
      * become roots (-1). The collector itself is not mutated.

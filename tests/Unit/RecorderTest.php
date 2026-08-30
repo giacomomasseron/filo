@@ -61,3 +61,15 @@ test('a throwing closure propagates but still measures', function (): void {
 test('enabled mirrors FILO_BOOTSTRAPPED', function (): void {
     expect(Recorder::enabled())->toBe(defined('FILO_BOOTSTRAPPED'));
 });
+
+test('capture excludes paused time from the wall clock', function (): void {
+    if (!Recorder::enabled()) {
+        $this->markTestSkipped('needs FILO_ENABLED=1');
+    }
+    $t = Recorder::capture(function (): void {
+        usleep(20_000);
+        Collector::excludePause(20_000_000); // as Debugger does after a pause
+    });
+
+    expect($t->wallMs())->toBeLessThan(15.0);
+});

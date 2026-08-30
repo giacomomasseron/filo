@@ -71,8 +71,12 @@ final class TraceExtension implements Extension
     /** @internal */
     public function onStart(): void
     {
+        // Reset per test: without this the collector grows across the whole
+        // suite and, once capped, silently drops every later event.
+        // (Safe: the shutdown flush is suppressed; Debugger state is untouched.)
+        Collector::begin();
         $this->mark   = Collector::mark();
-        $this->start  = hrtime(true);
+        $this->start  = Collector::now();
         $this->failed = false;
     }
 
@@ -106,7 +110,8 @@ final class TraceExtension implements Extension
             $dataset,
             $this->failed ? 'failed' : 'traced',
             Collector::since($this->mark),
-            hrtime(true) - $this->start,
+            Collector::now() - $this->start,
+            Collector::capped(),
         );
     }
 

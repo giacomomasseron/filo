@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Filo\Testing\FiloNotEnabledException;
 use Filo\Testing\Trace;
+use Filo\Testing\TraceCappedException;
 
 function ev(int $i, int $p, string $fn, int $s, int $e): array
 {
@@ -66,7 +67,7 @@ test('toArray is trace format v1', function (): void {
     expect($a['version'])->toBe(1)
         ->and($a['duration'])->toBe(12_000_000)
         ->and($a['capped'])->toBeFalse()
-        ->and($a['context']['sapi'])->toBe('cli')
+        ->and($a['context']['sapi'])->toBe(PHP_SAPI)
         ->and($a['events'])->toHaveCount(4)
         ->and(json_decode(sampleTrace()->toJson(), true)['events'][3]['fn'])->toBe('App\Support\Money::of');
 });
@@ -84,4 +85,12 @@ test('matches is exact unless the pattern ends with *', function (): void {
         ->and(Trace::matches('App\Repo::*', 'App\Repo::find'))->toBeTrue()
         ->and(Trace::matches('App\Repo*', 'App\Repository::x'))->toBeTrue()
         ->and(Trace::matches('*', 'anything'))->toBeTrue();
+});
+
+test('call queries throw when the collector was capped', function (): void {
+    $t = new Trace([], 5_000_000, null, true, true);
+    expect($t->capped())->toBeTrue()
+        ->and($t->wallMs())->toBe(5.0)
+        ->and($t->toArray()['capped'])->toBeTrue()
+        ->and(fn () => $t->calls('x'))->toThrow(TraceCappedException::class, '500000');
 });

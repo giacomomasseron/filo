@@ -22,6 +22,15 @@ test('write produces a v1 trace file under .filo/traces/tests', function (): voi
     $t = json_decode((string) file_get_contents($path), true);
     expect($t['version'])->toBe(1)
         ->and($t['duration'])->toBe(3_000_000)
-        ->and($t['context'])->toBe(['sapi' => 'cli', 'test' => 'FooTest::bar', 'status' => 'failed'])
+        ->and($t['context'])->toBe(['sapi' => PHP_SAPI, 'test' => 'FooTest::bar', 'status' => 'failed'])
         ->and($t['events'])->toBe([]);
+});
+
+test('write records the real capped flag', function (): void {
+    $root = sys_get_temp_dir() . '/filo-artifact-capped-' . getmypid();
+    @mkdir($root, 0777, true);
+
+    $path = TestArtifact::write($root, 'FooTest', 'capped', null, 'traced', [], 1, true);
+
+    expect(json_decode((string) file_get_contents($path), true)['capped'])->toBeTrue();
 });

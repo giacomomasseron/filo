@@ -16,6 +16,7 @@ final class Trace
         private readonly int $wallNs,
         private readonly mixed $result = null,
         private readonly bool $enabled = true,
+        private readonly bool $capped = false,
     ) {
     }
 
@@ -34,6 +35,12 @@ final class Trace
         return $this->enabled;
     }
 
+    /** True when the collector dropped events during this capture. */
+    public function capped(): bool
+    {
+        return $this->capped;
+    }
+
     /** @return list<array{i:int,p:int,fn:string,file:string,line:int,s:int,e:int,m:int}> */
     public function events(): array
     {
@@ -42,7 +49,7 @@ final class Trace
 
     public function calls(string $fn): int
     {
-        $this->assertEnabled();
+        $this->assertQueryable();
         $n = 0;
         foreach ($this->events as $e) {
             if (self::matches($fn, $e['fn'])) {
@@ -55,7 +62,7 @@ final class Trace
 
     public function inclusiveMs(string $fn): float
     {
-        $this->assertEnabled();
+        $this->assertQueryable();
         $ns = 0;
         foreach ($this->events as $e) {
             if (self::matches($fn, $e['fn'])) {
@@ -68,7 +75,7 @@ final class Trace
 
     public function selfMs(string $fn): float
     {
-        $this->assertEnabled();
+        $this->assertQueryable();
         $self = $this->selfNsById();
         $ns   = 0;
         foreach ($this->events as $e) {
@@ -116,8 +123,8 @@ final class Trace
             'version'  => 1,
             'ts'       => date('c'),
             'duration' => $this->wallNs,
-            'capped'   => false,
-            'context'  => ['sapi' => 'cli', 'capture' => true],
+            'capped'   => $this->capped,
+            'context'  => ['sapi' => PHP_SAPI, 'capture' => true],
             'events'   => $this->events,
         ];
     }
@@ -156,10 +163,13 @@ final class Trace
         return $self;
     }
 
-    private function assertEnabled(): void
+    private function assertQueryable(): void
     {
         if (!$this->enabled) {
             throw FiloNotEnabledException::create();
+        }
+        if ($this->capped) {
+            throw TraceCappedException::create();
         }
     }
 }

@@ -63,3 +63,7 @@ test('since on a mark past the end returns an empty list', function (): void {
     expect(Collector::since(0))->toBe([])
         ->and(Collector::since(10))->toBe([]);
 });
+
+test('capped reports the collector cap state', function (): void {
+    expect(Collector::capped())->toBeFalse();
+});

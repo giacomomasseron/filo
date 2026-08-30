@@ -33,6 +33,7 @@ final class TestArtifact
         string $status,
         array $events,
         int $wallNs,
+        bool $capped = false,
     ): string {
         $dir = $projectRoot . '/.filo/traces/tests';
         if (!is_dir($dir)) {
@@ -44,11 +45,17 @@ final class TestArtifact
             'version'  => 1,
             'ts'       => date('c'),
             'duration' => $wallNs,
-            'capped'   => false,
-            'context'  => ['sapi' => 'cli', 'test' => $class . '::' . $method, 'status' => $status],
+            'capped'   => $capped,
+            'context'  => ['sapi' => PHP_SAPI, 'test' => $class . '::' . $method, 'status' => $status],
             'events'   => $events,
         ];
-        file_put_contents($path, json_encode($trace, JSON_INVALID_UTF8_SUBSTITUTE));
+
+        // Fail open: an unwritable artifact must never break the suite.
+        $json = json_encode($trace, JSON_INVALID_UTF8_SUBSTITUTE);
+        if ($json === false) {
+            return $path;
+        }
+        @file_put_contents($path, $json);
 
         return $path;
     }
