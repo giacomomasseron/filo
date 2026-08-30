@@ -160,8 +160,10 @@ final class IncludeStreamWrapper
 
     public function stream_lock(int $operation): bool
     {
-        // LOCK_* with 0 means "release info request" from some callers.
-        return $operation === 0 ? false : flock($this->handle, $operation);
+        // $operation === 0 is PHP's lock-CAPABILITY probe
+        // (php_stream_supports_lock). Answering false makes
+        // file_put_contents(..., LOCK_EX) warn and write nothing.
+        return $operation === 0 ? true : flock($this->handle, $operation);
     }
 
     public function stream_set_option(int $option, int $arg1, ?int $arg2): bool
