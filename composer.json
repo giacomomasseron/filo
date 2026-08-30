@@ -10,7 +10,7 @@
     },
     "require-dev": {
         "pestphp/pest": "^2.0 || ^3.0",
-        "phpunit/phpunit": "^10.0 || ^11.0"
+        "phpunit/phpunit": "^10.5.62 || ^11.0"
     },
     "suggest": {
         "pestphp/pest": "toRunUnder()/toCall() expectations and automatic per-test trace artifacts",
