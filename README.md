@@ -45,6 +45,79 @@ off out of the box).
 | `FILO_CACHE_DIR`  | `<tmp>/filo-cache`  | Instrumented-file cache                   |
 | `FILO_EXCLUDE`    | `vendor`              | Comma-separated path substrings to skip   |
 
+## Tests & CI
+
+filo works inside your test suite once the process is enabled
+(`FILO_ENABLED=1 vendor/bin/pest`, or the `.filo-on` marker).
+
+### Performance assertions (no baselines — explicit thresholds only)
+
+**Pest**
+
+```php
+expect(fn () => $repo->paginateByUser($user))->toRunUnder(10);          // ms
+expect(fn () => $service->list())->toCall('App\Repo::find')->atMost(1);  // N+1 guard
+expect(fn () => $service->list())->toCallOnce('App\Repo::find');
+expect(fn () => $service->list())->toNotCall('App\Mail\*');            // trailing * = prefix glob
+```
+
+A chain of filo expectations captures the closure once; later expectations
+in the same chain reuse that trace.
+
+`expect()` also accepts a ready `Filo\Testing\Trace` (from
+`Filo\Testing\Recorder::capture(fn () => …)`) so one capture can back
+several assertions. Function names are the `__METHOD__` form:
+`App\Repo::find`, `my_function`, `{closure}`.
+
+**PHPUnit** — `use Filo\Testing\FiloAssertions;` in your test case:
+
+```php
+$this->assertRunsUnder(10, fn () => $repo->paginateByUser($user));
+$this->assertCallCount('App\Repo::find', atMost: 1, callable: fn () => $service->list());
+$this->assertNoCalls('App\Mail\*', fn () => $service->list());
+```
+
+Failures name the offender:
+`App\Repo::find called 11 times, expected at most 1` /
+`took 14.2 ms, limit 10 ms (slowest self-time: App\Repo::find 9.8 ms ×11)`.
+If the suite runs without filo enabled, call-based assertions throw
+`FiloNotEnabledException` instead of silently passing.
+
+### Trace artifacts per test
+
+Register the extension (Pest reads `phpunit.xml` too):
+
+```xml
+<extensions>
+  <bootstrap class="Filo\Testing\PHPUnit\TraceExtension"/>
+</extensions>
+```
+
+Every **failing** test, and every class-based test marked
+`#[Filo\Testing\Traced]` (on the method or the class), writes
+`.filo/traces/tests/<Class>__<method>.json`. Open them with
+`vendor/bin/filo serve`. Pest closure-style tests get artifacts on failure
+only (there is nowhere to put an attribute).
+
+### Breakpoints in a test
+
+`FILO_ENABLED=1 vendor/bin/pest --filter=checkout` with a breakpoint set
+(`vendor/bin/filo break "App\Service\Checkout::charge"`): the test pauses,
+inspect with `vendor/bin/filo pending` / `show <id>` / the viewer, then
+`continue`. Pause time is excluded from `toRunUnder` measurements. With
+`--parallel` or `--process-isolation` several workers may pause at once.
+
+### GitHub Actions
+
+```yaml
+- run: FILO_ENABLED=1 vendor/bin/pest
+- uses: actions/upload-artifact@v4
+  if: failure()
+  with: { name: filo-traces, path: .filo/traces/ }
+```
+
+Download the artifact, drop it into `.filo/traces/`, run `vendor/bin/filo serve`.
+
 ## Trace format (v1)
 
 ```jsonc

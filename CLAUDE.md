@@ -7,18 +7,15 @@ modified source from memory. Original files are NEVER touched; instrumented
 copies live only in a cache. Composer package `giacomomasseron/filo`,
 namespace `Filo\`, PHP ^8.1. "filo" = Italian for thread (Ariadne's thread).
 
-## Status: written but NEVER EXECUTED
-
-This codebase was authored in an environment without a PHP runtime.
-It compiles in the author's head, not in CI. Before any new feature,
-run the verification pass below and fix what breaks.
+## Status: verified on PHP 8.5 locally; CI matrix 8.1–8.4 in .github/workflows/ci.yml
 
 ## Verification pass (do this first)
 
 1. `composer install`
 2. `php -l` every file in `src/`, `bootstrap.php`, `bin/filo`, `server/index.php`
-3. `FILO_ENABLED=1 php -d opcache.enable_cli=0 examples/smoke.php` — must print 3 PASS lines
-4. Known-risk spots, in order of suspicion:
+3. `FILO_ENABLED=1 vendor/bin/pest` — all green
+4. `FILO_ENABLED=1 php -d opcache.enable_cli=0 examples/smoke.php` — must print 3 PASS lines
+5. Known-risk spots, in order of suspicion:
    - php-parser v5 API names in `src/HookVisitor.php` (`ArrayItem` moved out of
      `Expr\` in v5; `Int_` was `LNumber` in v4) and `Instrumenter.php`
      (`createForHostVersion()`)
@@ -26,8 +23,8 @@ run the verification pass below and fix what breaks.
      `IncludeStreamWrapper::stream_open()` on the target SAPI
    - `stream_stat()` on the `php://memory` handle serving instrumented includes
    - `If_` node construction args in `HookVisitor` (named-ish `['stmts' => …]` subnode array)
-5. Breakpoints end-to-end: `examples/break-demo.php` (two terminals, see its header)
-6. `vendor/bin/filo serve` — the inline JS in `server/index.php` is untested;
+6. Breakpoints end-to-end: `examples/break-demo.php` (two terminals, see its header)
+7. `vendor/bin/filo serve` — the inline JS in `server/index.php` is untested;
    verify trace list renders, call tree expands, continue button releases a pause
 
 ## Architecture invariants (do not break these)
@@ -57,6 +54,16 @@ run the verification pass below and fix what breaks.
   fails (cwd=public/, path-repo symlink), `findProjectRoot()` walks up
   from SCRIPT_FILENAME dir and cwd until it finds composer.json or .filo/.
   This was already gotten wrong once.
+- **Testing module** (`src/Testing/`): framework-free classes (Trace,
+  Recorder, Assert, exceptions, Traced, PHPUnit/TestArtifact) are eagerly
+  required in `bootstrap.php`; classes that reference PHPUnit/Pest
+  (FiloAssertions, PHPUnit/TraceExtension, Pest/*) are autoloaded only.
+  `Collector::mark()/since()` are the only collector additions — hot path untouched.
+- **Own test suite**: `FILO_ENABLED=1 vendor/bin/pest`. Instrumented fixtures
+  are written to a temp dir by `tests/Support/TempProject`. The `fixture`
+  group is excluded from normal runs and executed by
+  `tests/Integration/ArtifactsTest.php` in a child process with
+  `FILO_PROJECT_ROOT` set to a temp dir.
 
 ## Decisions already made (don't relitigate casually)
 
@@ -82,15 +89,16 @@ drift inside instrumented files (pretty printer) — trace line numbers are
 correct (baked from original AST); format-preserving printer is the v3 fix.
 Arrow functions, native functions, eval'd code = caller self-time.
 
+- `proc_open()` with `['file', path, mode]` descriptors fails under the wrapper — use pipes.
+- `file_put_contents(..., LOCK_EX)` through the wrapper warns "Exclusive locks are not supported for this stream" (seen from Pest's result cache) — harmless, fix pending.
+
 ## Roadmap candidates (phase 3+)
 
-1. Real test suite (PHPUnit): wrapper proxy ops, visitor output snapshots,
-   collector linkage, Debugger timeout path. CI matrix PHP 8.1–8.4.
-2. opcache coexistence (`opcache_invalidate` on toggle).
-3. Format-preserving printer for exact line numbers.
-4. Long-running runtime adapters (Octane/RoadRunner: `Collector::cycle()`).
-5. Sampling mode (instrument N% of requests) for staging.
-6. Designed web UI from Claude Design: drop exported files into server/ui/
+1. opcache coexistence (`opcache_invalidate` on toggle).
+2. Format-preserving printer for exact line numbers.
+3. Long-running runtime adapters (Octane/RoadRunner: `Collector::cycle()`).
+4. Sampling mode (instrument N% of requests) for staging.
+5. Designed web UI from Claude Design: drop exported files into server/ui/
    (served automatically, flat dir, extension whitelist in server/index.php).
    Never serve static files via `return false` in the php -S router — it
    resolves against project root and exposes source.
