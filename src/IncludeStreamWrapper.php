@@ -199,9 +199,15 @@ final class IncludeStreamWrapper
     public function url_stat(string $path, int $flags): array|false
     {
         return self::native(static function () use ($path, $flags) {
-            // QUIET: file_exists() etc. must not raise warnings.
+            // QUIET: file_exists()/is_dir() etc. must not raise warnings — and
+            // `@stat()` is NOT enough: a registered error handler (PHPUnit's)
+            // still receives the suppressed E_WARNING. Probe first.
             if ($flags & STREAM_URL_STAT_QUIET) {
-                return ($flags & STREAM_URL_STAT_LINK) ? @lstat($path) : @stat($path);
+                if ($flags & STREAM_URL_STAT_LINK) {
+                    return is_link($path) || file_exists($path) ? @lstat($path) : false;
+                }
+
+                return file_exists($path) ? @stat($path) : false;
             }
 
             return ($flags & STREAM_URL_STAT_LINK) ? lstat($path) : stat($path);

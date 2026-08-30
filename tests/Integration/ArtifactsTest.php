@@ -34,22 +34,30 @@ test('failing and #[Traced] tests produce artifacts; untraced passing tests do n
     [$code, $out, $files] = runFixtures($root, true);
 
     expect($code)->not->toBe(0, $out); // the fixture group contains a failing test
-    $names = array_map('basename', $files);
-    sort($names);
 
-    // Pest compiles closure tests to methods on a generated P\... class;
-    // the exact method name is Pest-version-dependent (observed on Pest
-    // 3.8.x / PHP 8.5: `__pest_evaluable_<slug>`). The count (2) and the
-    // two statuses below are the contract, not this literal name.
-    expect($names)->toBe([
-        'Filo_Tests_Fixtures_FixtureTracedTest__testTracedPasses.json',
-        'P_Tests_Fixtures_FixtureFailingTest____pest_evaluable_fixture__deliberately_failing_test.json',
-    ]);
+    // Pest compiles closure tests to methods on a generated P\... class; the
+    // exact method name is Pest-version-dependent (observed on Pest 3.8.x /
+    // PHP 8.5: `__pest_evaluable_<slug>`). Assert the contract instead of the
+    // literal name: exactly 2 artifacts, one failed (the closure fixture),
+    // one traced (the #[Traced] method on the class-based fixture).
+    expect($files)->toHaveCount(2, $out);
 
-    $failed = json_decode((string) file_get_contents($root . '/.filo/traces/tests/' . $names[1]), true);
-    expect($failed['context']['status'])->toBe('failed');
-    $traced = json_decode((string) file_get_contents($root . '/.filo/traces/tests/' . $names[0]), true);
-    expect($traced['context']['status'])->toBe('traced');
+    $decoded = array_map(
+        static fn (string $file): array => ['name' => basename($file), 'trace' => json_decode((string) file_get_contents($file), true)],
+        $files,
+    );
+
+    $failed = array_values(array_filter(
+        $decoded,
+        static fn (array $d): bool => $d['trace']['context']['status'] === 'failed' && str_contains($d['name'], 'FixtureFailingTest'),
+    ));
+    expect($failed)->toHaveCount(1, $out);
+
+    $traced = array_values(array_filter(
+        $decoded,
+        static fn (array $d): bool => $d['trace']['context']['status'] === 'traced' && str_contains($d['name'], 'FixtureTracedTest__testTracedPasses'),
+    ));
+    expect($traced)->toHaveCount(1, $out);
 
     // No process-wide trace at exit: only the tests/ subdir exists.
     expect(glob($root . '/.filo/traces/*.json'))->toBe([]);
