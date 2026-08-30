@@ -12,6 +12,10 @@ declare(strict_types=1);
  *   expect(fn () => ...)->toNotCall('App\Repo::find');
  *
  * `expect()` may receive a Closure or an already captured Filo\Testing\Trace.
+ * A closure is captured (run) only once per chain: every Filo expectation
+ * below replaces $this->value with the captured Trace, so a later Filo
+ * expectation in the same chain reuses it via filo_pest_trace_of() instead
+ * of re-invoking the closure.
  *
  * `toNotCall()` exists instead of `->not->toCall()`: the installed Pest
  * (pestphp/pest v3.8.7) represents `->not` as Pest\Expectations\OppositeExpectation,
@@ -63,6 +67,12 @@ expect()->extend('toRunUnder', function (float $ms) {
     $trace = filo_pest_trace_of($this->value);
     filo_pest_check(static fn () => Assert::runsUnder($trace, $ms));
 
+    // Memoize: swap $value for the captured Trace so a later Filo
+    // expectation chained after this one (e.g. ->toCall(...)) reuses it
+    // via filo_pest_trace_of() instead of re-invoking (and re-running the
+    // side effects of) the original closure.
+    $this->value = $trace;
+
     return $this;
 });
 
@@ -76,7 +86,9 @@ expect()->extend('toCall', function (string $fn) {
     // expectation's own $value for the CallExpectation: Pest's generic
     // __call() fallback (Expectation::__call(), used whenever a method
     // isn't a known/extended one) then delegates atMost()/atLeast()/
-    // times() straight onto that object.
+    // times() straight onto that object. This also memoizes the capture
+    // (see the module docblock): later Filo expectations chained off the
+    // CallExpectation reuse the same Trace via CallExpectation::trace().
     $this->value = new CallExpectation($trace, $fn);
 
     return $this;
@@ -85,6 +97,9 @@ expect()->extend('toCall', function (string $fn) {
 expect()->extend('toCallOnce', function (string $fn) {
     $trace = filo_pest_trace_of($this->value);
     filo_pest_check(static fn () => Assert::callCount($trace, $fn, atLeast: 1, atMost: 1));
+
+    // Memoize: see the ->toRunUnder() extend above for why.
+    $this->value = $trace;
 
     return $this;
 });
@@ -102,6 +117,9 @@ expect()->extend('toNotCall', function (string $fn) {
     // dedicated, explicitly-registered expectation instead of ->not->toCall().
     $trace = filo_pest_trace_of($this->value);
     filo_pest_check(static fn () => Assert::noCalls($trace, $fn));
+
+    // Memoize: see the ->toRunUnder() extend above for why.
+    $this->value = $trace;
 
     return $this;
 });

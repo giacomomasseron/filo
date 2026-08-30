@@ -59,6 +59,14 @@ test('toNotCall asserts zero calls', function (): void {
         ->toThrow(ExpectationFailedException::class, 'expected no calls');
 });
 
+test('chaining expectations on a closure captures it only once', function (): void {
+    $calls = 0;
+    $fn = function () use (&$calls): void { $calls++; filo_pest_list(1); };
+
+    expect($fn)->toRunUnder(500)->toCall('filo_pest_find')->atLeast(1);
+    expect($calls)->toBe(1);
+});
+
 test('a ready Trace can be used instead of a closure', function (): void {
     $trace = Recorder::capture(fn () => filo_pest_list(2));
     expect($trace)->toRunUnder(500);
