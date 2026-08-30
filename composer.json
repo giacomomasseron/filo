@@ -16,6 +16,13 @@
         "pestphp/pest": "toRunUnder()/toCall() expectations and automatic per-test trace artifacts",
         "phpunit/phpunit": "Filo\\Testing\\FiloAssertions trait and the TraceExtension"
     },
+    "extra": {
+        "pest": {
+            "plugins": [
+                "Filo\\Testing\\Pest\\Plugin"
+            ]
+        }
+    },
     "autoload": {
         "psr-4": {
             "Filo\\": "src/"
