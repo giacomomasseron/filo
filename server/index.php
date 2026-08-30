@@ -13,6 +13,8 @@ declare(strict_types=1);
  *  GET  /api/traces                     -> [full trace JSON + {name}], newest first, at most
  *                                          TRACE_LIST_LIMIT entries (the UI renders straight
  *                                          from `events`, so summaries aren't enough)
+ *                                          tests/<Class__method>.json artifacts are listed
+ *                                          with the "tests/" prefix in name
  *  GET  /api/traces/{name}              -> one full trace JSON (schema: README "Trace format")
  *  GET  /api/breaks                     -> [{id, fn, file, line, ts, uri, vars}]
  *  POST /api/breaks/{id}/continue       -> release one paused request
@@ -59,7 +61,9 @@ const TRACE_LIST_LIMIT = 50;
 
 if ($path === '/api/traces' && $method === 'GET') {
     // File names start with Ymd-His, so a reverse name sort is newest-first.
-    $files = glob(rtrim($outputDir, '/') . '/*.json') ?: [];
+    // tests/ artifacts (Class__method.json) sort after digits and so come first.
+    $dir   = rtrim($outputDir, '/');
+    $files = array_merge(glob($dir . '/*.json') ?: [], glob($dir . '/tests/*.json') ?: []);
     rsort($files, SORT_STRING);
 
     $out = [];
@@ -68,13 +72,13 @@ if ($path === '/api/traces' && $method === 'GET') {
         if (!is_array($t) || !isset($t['events'])) {
             continue;
         }
-        $t['name'] = basename($f);
+        $t['name'] = substr($f, strlen($dir) + 1); // "x.json" or "tests/x.json"
         $out[]     = $t;
     }
     $json($out);
 }
 
-if (preg_match('#^/api/traces/([A-Za-z0-9._-]+\.json)$#', $path, $m) && $method === 'GET') {
+if (preg_match('#^/api/traces/((?:tests/)?[A-Za-z0-9._\#-]+\.json)$#', $path, $m) && $method === 'GET') {
     $file = rtrim($outputDir, '/') . '/' . $m[1]; // regex forbids traversal
     is_file($file) || $json(['error' => 'not found'], 404);
     header('Content-Type: application/json');
