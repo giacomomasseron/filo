@@ -33,11 +33,40 @@ final class TempProject
 
     public static function cleanup(): void
     {
-        if (self::$dir !== null && is_dir(self::$dir)) {
-            foreach (glob(self::$dir . '/*') ?: [] as $f) {
-                @unlink($f);
-            }
-            @rmdir(self::$dir);
+        if (self::$dir !== null) {
+            self::removeTree(self::$dir);
         }
+    }
+
+    /**
+     * Removes every temp root this process created (fixtures plus the
+     * per-test roots of ArtifactsTest / TestArtifactTest / ApiContractTest).
+     * Registered as a shutdown function in tests/Pest.php.
+     */
+    public static function purgeOwn(): void
+    {
+        self::cleanup();
+        $pid = getmypid();
+        foreach (['filo-artifacts-' . $pid . '-*', 'filo-artifact-' . $pid, 'filo-artifact-capped-' . $pid, 'filo-api-' . $pid] as $pattern) {
+            foreach (glob(sys_get_temp_dir() . '/' . $pattern) ?: [] as $d) {
+                self::removeTree($d);
+            }
+        }
+    }
+
+    /** rm -rf, refusing anything outside this process's filo-* temp dirs. */
+    public static function removeTree(string $dir): void
+    {
+        if (!str_starts_with($dir, sys_get_temp_dir() . '/filo-') || !is_dir($dir)) {
+            return;
+        }
+        $it = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::CHILD_FIRST,
+        );
+        foreach ($it as $f) {
+            $f->isDir() ? @rmdir($f->getPathname()) : @unlink($f->getPathname());
+        }
+        @rmdir($dir);
     }
 }

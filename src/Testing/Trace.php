@@ -137,9 +137,6 @@ final class Trace
     /** Exact match, or prefix match when the pattern ends with '*'. */
     public static function matches(string $pattern, string $fn): bool
     {
-        if ($pattern === '*') {
-            return true;
-        }
         if (str_ends_with($pattern, '*')) {
             return str_starts_with($fn, substr($pattern, 0, -1));
         }

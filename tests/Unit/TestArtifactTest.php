@@ -8,7 +8,7 @@ test('fileName sanitises class, method and dataset', function (): void {
     expect(TestArtifact::fileName('App\Tests\FooTest', 'it_works', null))
         ->toBe('App_Tests_FooTest__it_works.json')
         ->and(TestArtifact::fileName('FooTest', 'bar', 'with spaces/slashes'))
-        ->toBe('FooTest__bar#with-spaces-slashes.json');
+        ->toBe('FooTest__bar--with-spaces-slashes.json');
 });
 
 test('write produces a v1 trace file under .filo/traces/tests', function (): void {

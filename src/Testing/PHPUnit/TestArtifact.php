@@ -14,10 +14,12 @@ final class TestArtifact
     {
         $name = str_replace('\\', '_', $class) . '__' . $method;
         if ($dataset !== null && $dataset !== '') {
-            $name .= '#' . $dataset;
+            // '--' rather than '#': the name appears in /api/traces/{name}
+            // URLs, where '#' would be a fragment delimiter.
+            $name .= '--' . $dataset;
         }
 
-        return preg_replace('/[^A-Za-z0-9_.#-]+/', '-', $name) . '.json';
+        return preg_replace('/[^A-Za-z0-9_.-]+/', '-', $name) . '.json';
     }
 
     /**

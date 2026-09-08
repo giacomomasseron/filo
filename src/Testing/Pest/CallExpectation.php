@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace Filo\Testing\Pest;
 
 use Filo\Testing\Assert;
-use Filo\Testing\ExpectationFailed;
 use Filo\Testing\Trace;
-use PHPUnit\Framework\ExpectationFailedException;
 
-/** Returned by expect(fn)->toCall('fn'); the closure has already been captured once. */
+/**
+ * Returned by expect(fn)->toCall('fn'); the closure has already been captured
+ * once. NOTE: toCall() alone asserts nothing — always finish the chain with
+ * atMost(), atLeast() or times().
+ */
 final class CallExpectation
 {
     public function __construct(private readonly Trace $trace, private readonly string $fn)
@@ -38,18 +40,11 @@ final class CallExpectation
 
     private function check(\Closure $c): self
     {
-        try {
-            $c();
-        } catch (ExpectationFailed $e) {
-            throw new ExpectationFailedException($e->getMessage());
-        }
-
-        // Assert::callCount() only throws on failure; on success it
-        // returns void without touching PHPUnit's assertion counter,
-        // which makes a test that only chains atMost()/atLeast()/times()
-        // come back "risky: this test did not perform any assertions".
-        // Register one explicitly so a clean pass reads as an actual pass.
-        \PHPUnit\Framework\Assert::assertTrue(true);
+        // Shared with the expectations: converts ExpectationFailed and
+        // registers one PHPUnit assertion so a clean pass isn't "risky".
+        // Expectations.php is always loaded before a CallExpectation can
+        // exist (toCall() lives there), so the function is available.
+        \filo_pest_check($c);
 
         return $this;
     }

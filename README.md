@@ -57,6 +57,7 @@ filo works inside your test suite once the process is enabled
 ```php
 expect(fn () => $repo->paginateByUser($user))->toRunUnder(10);          // ms
 expect(fn () => $service->list())->toCall('App\Repo::find')->atMost(1);  // N+1 guard
+// NB: toCall() alone asserts nothing — always finish with atMost()/atLeast()/times().
 expect(fn () => $service->list())->toCallOnce('App\Repo::find');
 expect(fn () => $service->list())->toNotCall('App\Mail\*');            // trailing * = prefix glob
 ```

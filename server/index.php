@@ -83,7 +83,7 @@ if ($path === '/api/traces' && $method === 'GET') {
     $json($out);
 }
 
-if (preg_match('#^/api/traces/((?:tests/)?[A-Za-z0-9._\#-]+\.json)$#', $path, $m) && $method === 'GET') {
+if (preg_match('#^/api/traces/((?:tests/)?[A-Za-z0-9._-]+\.json)$#', $path, $m) && $method === 'GET') {
     $file = rtrim($outputDir, '/') . '/' . $m[1]; // regex forbids traversal
     is_file($file) || $json(['error' => 'not found'], 404);
     header('Content-Type: application/json');

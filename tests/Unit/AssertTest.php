@@ -53,3 +53,9 @@ test('callCount on a disabled trace surfaces FiloNotEnabledException', function 
     expect(fn () => Assert::callCount(new Trace([], 1, null, false), 'x', atMost: 1))
         ->toThrow(Filo\Testing\FiloNotEnabledException::class);
 });
+
+test('runsUnder fails at exactly the limit (strictly under)', function (): void {
+    $t = new Trace([], 10_000_000);
+    expect(fn () => Assert::runsUnder($t, 10))
+        ->toThrow(ExpectationFailed::class, 'took 10 ms, limit 10 ms');
+});
