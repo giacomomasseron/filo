@@ -1,5 +1,9 @@
 # filo
 
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/giacomomasseron/filo.svg?style=flat-square)](https://packagist.org/packages/giacomomasseron/filo)
+[![GitHub Tests Action Status](https://img.shields.io/github/actions/workflow/status/giacomomasseron/filo/ci.yml?branch=main&label=tests&style=flat-square)](https://github.com/giacomomasseron/filo/actions?query=workflow%3ACI+branch%3Amain)
+[![Total Downloads](https://img.shields.io/packagist/dt/giacomomasseron/filo.svg?style=flat-square)](https://packagist.org/packages/giacomomasseron/filo)
+
 Zero-extension PHP call tracer. Userland instrumentation via a `file://`
 stream wrapper + AST rewriting (nikic/php-parser). Original files are
 never modified; instrumented copies live only in a throwaway cache.
