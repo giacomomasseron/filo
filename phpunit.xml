@@ -12,7 +12,7 @@
         <testsuite name="Fixtures"><directory>tests/Fixtures</directory></testsuite>
     </testsuites>
     <groups>
-        <exclude><group>fixture</group></exclude>
+        <exclude><group>fixture</group><group>threshold-fixture</group></exclude>
     </groups>
     <extensions>
         <bootstrap class="Filo\Testing\PHPUnit\TraceExtension"/>

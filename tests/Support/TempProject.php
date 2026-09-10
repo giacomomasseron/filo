@@ -40,14 +40,14 @@ final class TempProject
 
     /**
      * Removes every temp root this process created (fixtures plus the
-     * per-test roots of ArtifactsTest / TestArtifactTest / ApiContractTest).
-     * Registered as a shutdown function in tests/Pest.php.
+     * per-test roots of ArtifactsTest / ThresholdTest / TestArtifactTest /
+     * ApiContractTest). Registered as a shutdown function in tests/Pest.php.
      */
     public static function purgeOwn(): void
     {
         self::cleanup();
         $pid = getmypid();
-        foreach (['filo-artifacts-' . $pid . '-*', 'filo-artifact-' . $pid, 'filo-artifact-capped-' . $pid, 'filo-api-' . $pid] as $pattern) {
+        foreach (['filo-artifacts-' . $pid . '-*', 'filo-threshold-' . $pid . '-*', 'filo-artifact-' . $pid, 'filo-artifact-capped-' . $pid, 'filo-api-' . $pid] as $pattern) {
             foreach (glob(sys_get_temp_dir() . '/' . $pattern) ?: [] as $d) {
                 self::removeTree($d);
             }

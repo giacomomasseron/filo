@@ -6,8 +6,10 @@ namespace Filo\Testing\PHPUnit;
 
 use Filo\Collector;
 use Filo\Testing\Recorder;
+use Filo\Testing\Trace;
 use Filo\Testing\Traced;
 use Filo\Tracer;
+use InvalidArgumentException;
 use PHPUnit\Event\Code\TestMethod;
 use PHPUnit\Event\Test\Errored;
 use PHPUnit\Event\Test\ErroredSubscriber;
@@ -32,12 +34,19 @@ use ReflectionMethod;
  * Register in phpunit.xml:
  *   <extensions><bootstrap class="Filo\Testing\PHPUnit\TraceExtension"/></extensions>
  *
+ * Optional <parameter name="threshold" value="200"/> sets a global per-test
+ * limit in ms, enforced by tests that use Filo\Testing\EnforcesThreshold.
+ *
  * No-op when filo is not bootstrapped.
  */
 final class TraceExtension implements Extension
 {
-    private int $mark   = 0;
-    private int $start  = 0;
+    // Static so EnforcesThreshold can read them from inside the running test.
+    private static bool $active      = false;
+    private static ?float $threshold = null;
+    private static int $mark         = 0;
+    private static int $start        = 0;
+
     private bool $failed = false;
 
     public function bootstrap(Configuration $configuration, Facade $facade, ParameterCollection $parameters): void
@@ -66,6 +75,39 @@ final class TraceExtension implements Extension
                 public function notify(Finished $event): void { $this->ext->onFinished($event); }
             },
         );
+        self::$active = true;
+
+        // Parsed last: a bad value throws, which PHPUnit reports as
+        // "Bootstrapping of extension ... failed: ..." while the subscribers
+        // registered above keep writing artifacts.
+        if ($parameters->has('threshold')) {
+            self::$threshold = self::parseThreshold($parameters->get('threshold'));
+        }
+    }
+
+    /**
+     * Global per-test limit in ms from the `threshold` parameter; null = none.
+     *
+     * @internal read by EnforcesThreshold
+     */
+    public static function threshold(): ?float
+    {
+        return self::$threshold;
+    }
+
+    /**
+     * The running test so far: its events and wall time since preparation
+     * started. Null when the extension isn't active.
+     *
+     * @internal read by EnforcesThreshold
+     */
+    public static function currentTest(): ?Trace
+    {
+        if (!self::$active) {
+            return null;
+        }
+
+        return new Trace(Collector::since(self::$mark), Collector::now() - self::$start, null, true, Collector::capped());
     }
 
     /** @internal */
@@ -75,8 +117,8 @@ final class TraceExtension implements Extension
         // suite and, once capped, silently drops every later event.
         // (Safe: the shutdown flush is suppressed; Debugger state is untouched.)
         Collector::begin();
-        $this->mark   = Collector::mark();
-        $this->start  = Collector::now();
+        self::$mark   = Collector::mark();
+        self::$start  = Collector::now();
         $this->failed = false;
     }
 
@@ -109,10 +151,19 @@ final class TraceExtension implements Extension
             $test->methodName(),
             $dataset,
             $this->failed ? 'failed' : 'traced',
-            Collector::since($this->mark),
-            Collector::now() - $this->start,
+            Collector::since(self::$mark),
+            Collector::now() - self::$start,
             Collector::capped(),
         );
+    }
+
+    private static function parseThreshold(string $raw): float
+    {
+        if (!is_numeric($raw) || (float) $raw <= 0) {
+            throw new InvalidArgumentException(sprintf("filo: threshold must be a positive number of milliseconds, got '%s'", $raw));
+        }
+
+        return (float) $raw;
     }
 
     private static function hasTracedAttribute(string $class, string $method): bool

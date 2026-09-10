@@ -104,6 +104,53 @@ Every **failing** test, and every class-based test marked
 `vendor/bin/filo serve`. Pest closure-style tests get artifacts on failure
 only (there is nowhere to put an attribute).
 
+### Global threshold
+
+`toRunUnder()` guards one closure. To put a ceiling on *every* test, give
+the extension a `threshold` in ms:
+
+```xml
+<extensions>
+  <bootstrap class="Filo\Testing\PHPUnit\TraceExtension">
+    <parameter name="threshold" value="200"/>
+  </bootstrap>
+</extensions>
+```
+
+Then turn enforcement on once. A PHPUnit extension can observe tests but
+not fail them, so the check lives in a trait:
+
+```php
+// tests/Pest.php
+uses(Filo\Testing\EnforcesThreshold::class)->in('Feature', 'Unit');
+
+// or PHPUnit: your base TestCase
+abstract class TestCase extends BaseTestCase
+{
+    use Filo\Testing\EnforcesThreshold;
+}
+```
+
+A test over the limit fails with
+`filo threshold: took 312 ms, limit 200 ms (slowest self-time: App\Repo::find 180 ms ×40)`
+and, like any failing test, gets a trace artifact. A test that is slow by
+design sets its own limit:
+
+```php
+$this->threshold(2000);  // this test may take up to 2 s
+$this->threshold(null);  // no limit for this test
+```
+
+The clock runs from test preparation (before `setUp`/`beforeEach`) to the
+end of the test body. `tearDown`/`afterEach`, breakpoint pauses and filo's
+first-include instrumentation don't count, but filo's per-call overhead
+does, so leave some headroom. A test that already failed keeps its own
+failure. Without filo enabled nothing is enforced, and neither is it under
+plain PHPUnit's `--process-isolation`: isolated test processes never see
+the extension's settings (Pest doesn't offer that option). An invalid value
+(e.g. `200ms`) makes PHPUnit report `Bootstrapping of extension … failed`
+with the offending value; trace artifacts keep working.
+
 ### Breakpoints in a test
 
 `FILO_ENABLED=1 vendor/bin/pest --filter=checkout` with a breakpoint set

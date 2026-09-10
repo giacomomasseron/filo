@@ -59,8 +59,12 @@ namespace `Filo\`, PHP ^8.1. "filo" = Italian for thread (Ariadne's thread).
 - **Testing module** (`src/Testing/`): framework-free classes (Trace,
   Recorder, Assert, exceptions, Traced, PHPUnit/TestArtifact) are eagerly
   required in `bootstrap.php`; classes that reference PHPUnit/Pest
-  (FiloAssertions, PHPUnit/TraceExtension, Pest/*) are autoloaded only.
+  (FiloAssertions, EnforcesThreshold, PHPUnit/TraceExtension, Pest/*) are
+  autoloaded only.
   `Collector::mark()/since()` are the only collector additions — hot path untouched.
+  The global per-test `threshold` is a TraceExtension parameter (kept in
+  static state), enforced by the EnforcesThreshold trait's `#[PostCondition]`
+  hook: PHPUnit extensions can observe tests but never fail them.
   The Pest plugin `Filo\Testing\Pest\Plugin` is declared in composer.json
   `extra.pest.plugins` and auto-discovered by Pest (root package included) —
   no manual `require` in tests/Pest.php.
@@ -68,7 +72,10 @@ namespace `Filo\`, PHP ^8.1. "filo" = Italian for thread (Ariadne's thread).
   are written to a temp dir by `tests/Support/TempProject`. The `fixture`
   group is excluded from normal runs and executed by
   `tests/Integration/ArtifactsTest.php` in a child process with
-  `FILO_PROJECT_ROOT` set to a temp dir.
+  `FILO_PROJECT_ROOT` set to a temp dir. Likewise the `threshold-fixture`
+  group (`tests/Fixtures/Threshold`) is run by
+  `tests/Integration/ThresholdTest.php` with a generated config that sets
+  `threshold`.
 
 ## Decisions already made (don't relitigate casually)
 
