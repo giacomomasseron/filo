@@ -47,8 +47,10 @@ namespace `Filo\`, PHP ^8.1. "filo" = Italian for thread (Ariadne's thread).
 - **Self-exclusion**: the package dir and cache dir are always excluded from
   instrumentation (see `Tracer::start`). Test fixtures must live OUTSIDE the
   repo (temp dir) — see `examples/smoke.php`.
-- **Pause time is excluded from traces** via `Collector::excludePause()`
-  (epoch shift). Don't "fix" timings by touching individual events.
+- **Pause time and cache-miss instrumentation time are excluded from
+  traces** via `Collector::excludePause()` (epoch shift; callers: `Debugger`,
+  `IncludeStreamWrapper::instrumentedCode()`). Don't "fix" timings by
+  touching individual events.
 - **Root-path arithmetic**: `bootstrap.php` sits at package root ⇒ project
   root is `dirname(__DIR__, 3)`; `src/` files ⇒ `dirname(__DIR__, 4)`. When that
   fails (cwd=public/, path-repo symlink), `findProjectRoot()` walks up

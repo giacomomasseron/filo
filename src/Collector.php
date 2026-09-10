@@ -90,11 +90,13 @@ final class Collector
     }
 
     /**
-     * Called by Debugger after a breakpoint pause. Shifting the epoch
-     * forward makes every SUBSEQUENT timestamp smaller by the paused
-     * duration: the paused frame and all open ancestors shrink by
-     * exactly the pause, while already-closed events are untouched.
-     * Net effect: breakpoints leave no mark on the timeline.
+     * Called by Debugger after a breakpoint pause, and by
+     * IncludeStreamWrapper after instrumenting a file on a cache miss.
+     * Shifting the epoch forward makes every SUBSEQUENT timestamp smaller
+     * by the excluded duration: the current frame and all open ancestors
+     * shrink by exactly that amount, while already-closed events are
+     * untouched. Net effect: neither breakpoints nor filo's own parsing
+     * leave a mark on the timeline.
      */
     public static function excludePause(int $ns): void
     {

@@ -346,23 +346,31 @@ final class IncludeStreamWrapper
                 return $code === false ? null : $code;
             }
 
-            $source = @file_get_contents($real);
-            if ($source === false) {
-                return null;
-            }
+            // Cache miss: parsing + rewriting is filo's own one-off cost, not
+            // the app's. Shift it out of the collector clock like a breakpoint
+            // pause, so the first request/test to touch a file isn't billed.
+            $missStart = hrtime(true);
+            try {
+                $source = @file_get_contents($real);
+                if ($source === false) {
+                    return null;
+                }
 
-            $code = Instrumenter::instrument($source);
-            if ($code === null) {
-                return null; // parse failure -> leave file untouched
-            }
+                $code = Instrumenter::instrument($source);
+                if ($code === null) {
+                    return null; // parse failure -> leave file untouched
+                }
 
-            // Atomic-ish write so parallel FPM workers never read half a file.
-            $tmp = $cache . '.' . getmypid() . '.tmp';
-            if (@file_put_contents($tmp, $code) !== false) {
-                @rename($tmp, $cache);
-            }
+                // Atomic-ish write so parallel FPM workers never read half a file.
+                $tmp = $cache . '.' . getmypid() . '.tmp';
+                if (@file_put_contents($tmp, $code) !== false) {
+                    @rename($tmp, $cache);
+                }
 
-            return $code;
+                return $code;
+            } finally {
+                Collector::excludePause(hrtime(true) - $missStart);
+            }
         });
     }
 }

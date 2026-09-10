@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Filo\Collector;
+use Filo\Instrumenter;
 use Filo\Testing\Recorder;
 use Filo\Testing\Trace;
 use Filo\Tests\Support\TempProject;
@@ -72,4 +73,28 @@ test('capture excludes paused time from the wall clock', function (): void {
     });
 
     expect($t->wallMs())->toBeLessThan(15.0);
+});
+
+test('capture excludes first-include instrumentation time from the wall clock', function (): void {
+    if (!Recorder::enabled()) {
+        $this->markTestSkipped('needs FILO_ENABLED=1');
+    }
+    // A fresh file name guarantees a cache miss. 2000 functions make
+    // php-parser's parse + rewrite dwarf PHP compiling the result.
+    $tag  = bin2hex(random_bytes(4));
+    $body = '';
+    for ($i = 0; $i < 2000; $i++) {
+        $body .= "function filo_cold_{$tag}_{$i}(int \$a): int { return \$a + {$i}; }\n";
+    }
+    $source = "<?php\n" . $body;
+    $path   = TempProject::fixture("cold_{$tag}.php", $source);
+
+    $t = Recorder::capture(static fn () => require $path);
+
+    // What instrumenting this file costs, timed directly outside any capture.
+    $start = hrtime(true);
+    Instrumenter::instrument($source);
+    $instrumentMs = (hrtime(true) - $start) / 1e6;
+
+    expect($t->wallMs())->toBeLessThan($instrumentMs / 2);
 });
