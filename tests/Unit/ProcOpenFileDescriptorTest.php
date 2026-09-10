@@ -31,8 +31,9 @@ test('a non-seekable file descriptor raises no warning under the wrapper', funct
     $seen = [];
     set_error_handler(static function (int $no, string $msg) use (&$seen): bool { $seen[] = $msg; return true; });
     try {
-        // /dev/null cannot seek; PHP seeks the stream while casting it.
-        $proc = proc_open([PHP_BINARY, '-r', 'echo "hi";'], [1 => ['file', '/dev/null', 'w']], $pipes);
+        // The null device cannot seek; PHP seeks the stream while casting it.
+        $null = PHP_OS_FAMILY === 'Windows' ? 'NUL' : '/dev/null';
+        $proc = proc_open([PHP_BINARY, '-r', 'echo "hi";'], [1 => ['file', $null, 'w']], $pipes);
         is_resource($proc) && proc_close($proc);
     } finally {
         restore_error_handler();

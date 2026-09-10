@@ -20,10 +20,11 @@ final class ApiServer
 
         $port = random_int(18000, 19999);
         self::$base = "http://127.0.0.1:$port";
-        $env = array_merge(getenv(), ['FILO_PROJECT_ROOT' => self::$root]);
+        $env  = array_merge(getenv(), ['FILO_PROJECT_ROOT' => self::$root]);
+        $null = PHP_OS_FAMILY === 'Windows' ? 'NUL' : '/dev/null';
         self::$proc = proc_open(
             [PHP_BINARY, '-S', "127.0.0.1:$port", dirname(__DIR__, 2) . '/server/index.php'],
-            [1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']],
+            [1 => ['file', $null, 'w'], 2 => ['file', $null, 'w']],
             $pipes,
             null,
             $env,
