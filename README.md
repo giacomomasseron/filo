@@ -8,6 +8,8 @@ Zero-extension PHP call tracer. Userland instrumentation via a `file://`
 stream wrapper + AST rewriting (nikic/php-parser). Original files are
 never modified; instrumented copies live only in a throwaway cache.
 
+**Documentation:** [giacomomasseron.github.io/filo](https://giacomomasseron.github.io/filo/)
+
 ## Install
 
 ```bash
