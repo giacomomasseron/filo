@@ -47,6 +47,12 @@ namespace `Filo\`, PHP ^8.1. "filo" = Italian for thread (Ariadne's thread).
 - **Self-exclusion**: the package dir and cache dir are always excluded from
   instrumentation (see `Tracer::start`). Test fixtures must live OUTSIDE the
   repo (temp dir) — see `examples/smoke.php`.
+- **Opcache is off for traced requests**: `Tracer::start()` calls
+  `ini_set('opcache.enable', '0')` (allowed at runtime, off-only, until the
+  request ends). Without it a warm cache bypasses the wrapper, and
+  instrumented code gets cached for untraced requests to run. Covered by
+  `tests/Integration/OpcacheTest.php` (php -S shares one opcache like FPM;
+  it needs `opcache.file_update_protection=0` for fresh fixture files).
 - **Pause time and cache-miss instrumentation time are excluded from
   traces** via `Collector::excludePause()` (epoch shift; callers: `Debugger`,
   `IncludeStreamWrapper::instrumentedCode()`). Don't "fix" timings by
@@ -95,15 +101,16 @@ namespace `Filo\`, PHP ^8.1. "filo" = Italian for thread (Ariadne's thread).
 
 ## Known limitations (documented, not bugs)
 
-Opcache must be off while tracing (and can serve stale instrumented code —
-`opcache_invalidate()` on state change is a wanted v3 fix). Line numbers
+Opcache is switched off per traced request automatically, except where an
+FPM pool pins `opcache.enable` via `php_admin_value`; preloaded files
+(`opcache.preload`) are never traced. Line numbers
 drift inside instrumented files (pretty printer) — trace line numbers are
 correct (baked from original AST); format-preserving printer is the v3 fix.
 Arrow functions, native functions, eval'd code = caller self-time.
 
 ## Roadmap candidates (phase 3+)
 
-1. opcache coexistence (`opcache_invalidate` on toggle).
+1. ~~opcache coexistence~~ — done: opcache is disabled per traced request.
 2. Format-preserving printer for exact line numbers.
 3. Long-running runtime adapters (Octane/RoadRunner: `Collector::cycle()`).
 4. Sampling mode (instrument N% of requests) for staging.

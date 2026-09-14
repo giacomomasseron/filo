@@ -36,12 +36,11 @@ The check is per-request, so toggling is instant — no restarts.
 `FILO_ENABLED=1`. A Laravel `.env` entry does *not* work — it loads
 after the tracer bootstraps. Use the marker file for that workflow.
 
-**One caveat:** if opcache is enabled in your dev setup, disable it
-while tracing (`opcache.enable=0` in your php.ini / Herd PHP settings) —
-cached opcodes bypass the tracer, and worse, opcache may keep serving
-*instrumented* code after you toggle tracing off, since the file on disk
-never changed. CLI is unaffected by default (`opcache.enable_cli` is
-off out of the box).
+**Opcache:** nothing to do. filo switches opcache off for each traced
+request, and only those, so a warm cache can't bypass the tracer and
+instrumented code never lands in the cache. The one exception is an FPM
+pool that pins `opcache.enable` with `php_admin_value`: that can't be
+changed at runtime, so turn opcache off there while tracing.
 
 ## Configuration (env vars)
 
@@ -246,8 +245,8 @@ at the top of `server/index.php`). Delete `server/ui/` to fall back.
 
 ## Known limitations (v1, by design)
 
-- **Opcache must be off while tracing** (see Run section) — cached
-  opcodes bypass the wrapper.
+- Files preloaded with `opcache.preload` never pass through the
+  wrapper, so they aren't traced.
 - Files loaded before `vendor/autoload.php` (the front controller) are
   not instrumented. Use `auto_prepend_file` pointing at
   `vendor/giacomomasseron/filo/bootstrap.php` for full coverage.

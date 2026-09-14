@@ -22,6 +22,19 @@ final class TempProject
         return self::$dir;
     }
 
+    /**
+     * A fresh, empty project root for a child process (FILO_PROJECT_ROOT).
+     * composer.json makes root discovery accept it.
+     */
+    public static function root(): string
+    {
+        $root = sys_get_temp_dir() . '/filo-root-' . getmypid() . '-' . bin2hex(random_bytes(3));
+        mkdir($root, 0777, true);
+        file_put_contents($root . '/composer.json', '{}');
+
+        return $root;
+    }
+
     /** Writes `$php` (full file content incl. `<?php`) and returns the path. */
     public static function fixture(string $name, string $php): string
     {
@@ -47,7 +60,7 @@ final class TempProject
     {
         self::cleanup();
         $pid = getmypid();
-        foreach (['filo-artifacts-' . $pid . '-*', 'filo-threshold-' . $pid . '-*', 'filo-artifact-' . $pid, 'filo-artifact-capped-' . $pid, 'filo-api-' . $pid] as $pattern) {
+        foreach (['filo-artifacts-' . $pid . '-*', 'filo-threshold-' . $pid . '-*', 'filo-artifact-' . $pid, 'filo-artifact-capped-' . $pid, 'filo-api-' . $pid, 'filo-root-' . $pid . '-*'] as $pattern) {
             foreach (glob(sys_get_temp_dir() . '/' . $pattern) ?: [] as $d) {
                 self::removeTree($d);
             }

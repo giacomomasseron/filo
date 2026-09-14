@@ -36,6 +36,13 @@ final class Tracer
         }
         self::$started = true;
 
+        // Opcache stores whatever the compiler was handed. Left on, a traced
+        // request runs opcodes an untraced one cached (bypassing the wrapper)
+        // and caches its instrumented code for untraced requests to run.
+        // opcache.enable can be switched off (never on) at runtime, and only
+        // until this request ends; untraced requests keep the cache.
+        ini_set('opcache.enable', '0');
+
         self::$projectRoot = self::findProjectRoot();
         self::$cacheDir    = self::env('FILO_CACHE_DIR', sys_get_temp_dir() . '/filo-cache');
         self::$outputDir   = self::outputDir(self::$projectRoot);
