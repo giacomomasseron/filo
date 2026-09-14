@@ -43,6 +43,11 @@ namespace `Filo\`, PHP ^8.1. "filo" = Italian for thread (Ariadne's thread).
   right after each body's `{` and right before its `}`, with no newlines, so
   every line keeps its number (`tests/Integration/LineNumbersTest.php`).
   Instrumenter re-parses the result and fails open if it doesn't parse.
+- **Closure names are baked literals, PHP 8.4 style**:
+  `{closure:<enclosing scope>:<line>}` on every PHP version (HookVisitor's
+  scope stack; arrow fns count as scopes; top level = the file's realpath).
+  `ClosureNamesTest` compares them with PHP's own `__METHOD__` on 8.4+.
+  Anonymous classes read `class@anonymous` (PHP's name has a path + counter).
 - **Traces always live in `<project>/.filo/traces`** (breaks in `…/breaks`),
   via `Tracer::outputDir()` — the only place that knows the path. Not
   configurable by design; `.filo/` must be gitignored.

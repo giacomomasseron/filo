@@ -20,9 +20,10 @@ use Throwable;
 final class Instrumenter
 {
     /** Part of the cache key: bump when the transform changes. */
-    public const VERSION = '5';
+    public const VERSION = '6';
 
-    public static function instrument(string $source): ?string
+    /** @param string $file the source's real path; names top-level closures */
+    public static function instrument(string $source, string $file = ''): ?string
     {
         try {
             $parser = (new ParserFactory())->createForHostVersion();
@@ -32,7 +33,7 @@ final class Instrumenter
                 return null;
             }
 
-            $hooks     = new HookVisitor($parser->getTokens());
+            $hooks     = new HookVisitor($parser->getTokens(), $file);
             $traverser = new NodeTraverser();
             $traverser->addVisitor($hooks);
             $traverser->traverse($ast);

@@ -73,8 +73,12 @@ in the same chain reuse that trace.
 
 `expect()` also accepts a ready `Filo\Testing\Trace` (from
 `Filo\Testing\Recorder::capture(fn () => …)`) so one capture can back
-several assertions. Function names are the `__METHOD__` form:
-`App\Repo::find`, `my_function`, `{closure}`.
+several assertions. Function and method names are the `__METHOD__` form
+(`App\Repo::find`, `my_function`; a trait method keeps the trait's name).
+Closures are named after where they are declared, the PHP 8.4 way, on
+every PHP version: `{closure:App\Repo::find():12}`, or
+`{closure:/path/to/file.php:3}` at the top level of a file. `{closure*`
+matches them all.
 
 **PHPUnit** — `use Filo\Testing\FiloAssertions;` in your test case:
 
@@ -205,6 +209,9 @@ protocol. Works alongside tracing.
 vendor/bin/filo break "App\\Services\\OrderService::listForUser"
 ```
 
+A closure is targeted by its trace name, e.g.
+`"{closure:App\\Services\\OrderService::listForUser():42}"`.
+
 Then trigger the code path (browse the page, run the command). The
 request **freezes** at that function's entry. From another terminal:
 
@@ -266,3 +273,6 @@ at the top of `server/index.php`). Delete `server/ui/` to fall back.
   self-time of their caller.
 - Long-running runtimes: call `\Filo\Collector::cycle($dir)` per
   request instead of relying on shutdown flush.
+- Closures inside anonymous classes are named
+  `{closure:class@anonymous::method():12}`; PHP 8.4's own name for them
+  also embeds the file path and a compile counter.

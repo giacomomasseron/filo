@@ -97,3 +97,17 @@ test('a disabled breakpoint does not pause', function (): void {
     expect($snapshot)->toBeNull()
         ->and($out)->toBe('ok');
 });
+
+test('a breakpoint can target one closure by its name', function (): void {
+    // functions.php puts the function on line 2 (after "<?php").
+    [$snapshot, $out] = pauseAndSnapshot(
+        '{closure:filo_bp_outer():2}',
+        'function filo_bp_outer(): string { return (function (int $n) { return "ok"; })(3); }',
+        'filo_bp_outer()',
+    );
+
+    expect($snapshot)->not->toBeNull('the breakpoint never paused: ' . $out)
+        ->and(json_decode($snapshot, true)['fn'])->toBe('{closure:filo_bp_outer():2}')
+        ->and(json_decode($snapshot, true)['vars']['n'])->toBe(3)
+        ->and($out)->toBe('ok');
+});

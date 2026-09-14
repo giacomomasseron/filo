@@ -356,7 +356,7 @@ final class IncludeStreamWrapper
                     return null;
                 }
 
-                $code = Instrumenter::instrument($source);
+                $code = Instrumenter::instrument($source, $real);
                 if ($code === null) {
                     return null; // parse failure -> leave file untouched
                 }
