@@ -16,6 +16,8 @@ namespace Filo;
  * proxied to the real wrapper.
  *
  * Pattern proven by dg/bypass-finals and phpunit's php-code-coverage.
+ *
+ * @internal Not part of the public API (README "Public API").
  */
 final class IncludeStreamWrapper
 {

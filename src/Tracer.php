@@ -15,20 +15,45 @@ namespace Filo;
  *   FILO_EXCLUDE=vendor,storage        comma-separated path substrings to skip
  *   FILO_BREAK_TIMEOUT=120             seconds before a paused breakpoint auto-continues
  *   FILO_PROJECT_ROOT=/app             override project-root discovery (see findProjectRoot)
+ *
+ * Public API: cycle(). Everything else here is @internal plumbing shared
+ * by bootstrap.php, bin/filo and the viewer.
  */
 final class Tracer
 {
     private static bool $started      = false;
     private static bool $suppressFlush = false;
 
+    /** @internal */
     public static string $cacheDir;
+    /** @internal */
     public static string $outputDir;
+    /** @internal */
     public static string $breaksDir;
+    /** @internal */
     public static string $projectRoot;
 
-    /** @var string[] path substrings that must NOT be instrumented */
+    /**
+     * @internal
+     * @var string[] path substrings that must NOT be instrumented
+     */
     public static array $exclude = [];
 
+    /**
+     * The per-request boundary for long-running runtimes (Octane,
+     * RoadRunner, FrankenPHP worker mode): writes the trace so far to
+     * .filo/traces, starts a fresh one and reloads breakpoints. Call it
+     * when a request ends. A no-op when tracing is off, so it can stay
+     * wired in permanently.
+     */
+    public static function cycle(): void
+    {
+        if (self::$started) {
+            Collector::cycle(self::$outputDir);
+        }
+    }
+
+    /** @internal Called once, by bootstrap.php. */
     public static function start(): void
     {
         if (self::$started) {
@@ -73,7 +98,7 @@ final class Tracer
 
         // Works for FPM, CLI and the built-in server. Long-running runtimes
         // (Octane, RoadRunner, FrankenPHP worker mode) should instead call
-        // Collector::cycle() at their per-request boundary — see README.
+        // Tracer::cycle() at their per-request boundary — see README.
         register_shutdown_function(static function (): void {
             if (!self::$suppressFlush) {
                 Collector::flush(self::$outputDir);
@@ -86,6 +111,8 @@ final class Tracer
     /**
      * Test runners write one trace per test (Filo\Testing\PHPUnit\TraceExtension)
      * and must not also get a giant process-wide trace at exit.
+     *
+     * @internal
      */
     public static function suppressShutdownFlush(): void
     {
@@ -107,6 +134,8 @@ final class Tracer
      * most web servers) run PHP with cwd = public/, and a Composer
      * path-repository symlink makes __DIR__ resolve outside the project,
      * so neither fixed candidate hits the real root.
+     *
+     * @internal
      */
     public static function findProjectRoot(): string
     {
@@ -146,6 +175,8 @@ final class Tracer
      * Traces always live inside the project: <root>/.filo/traces
      * (breaks/ beneath it). Shared by Tracer, bin/filo and the viewer so
      * they can never disagree about where the JSON is.
+     *
+     * @internal
      */
     public static function outputDir(?string $projectRoot = null): string
     {

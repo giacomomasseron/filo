@@ -12,6 +12,8 @@ use UnitEnum;
  * breakpoint snapshots. Depth-limited and size-limited on purpose:
  * a breakpoint in a controller can be holding an Eloquent model
  * graph — we want a useful glance, not a 40MB dump.
+ *
+ * @internal Not part of the public API (README "Public API").
  */
 final class VarExporter
 {

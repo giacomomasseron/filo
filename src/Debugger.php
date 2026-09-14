@@ -27,6 +27,8 @@ namespace Filo;
  * per request, inspect-and-continue — no stepping, no eval. That's the
  * honest boundary of userland instrumentation; people who need
  * engine-level stepping have Xdebug.
+ *
+ * @internal Not part of the public API (README "Public API").
  */
 final class Debugger
 {

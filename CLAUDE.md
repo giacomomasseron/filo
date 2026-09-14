@@ -48,6 +48,9 @@ namespace `Filo\`, PHP ^8.1. "filo" = Italian for thread (Ariadne's thread).
   scope stack; arrow fns count as scopes; top level = the file's realpath).
   `ClosureNamesTest` compares them with PHP's own `__METHOD__` on 8.4+.
   Anonymous classes read `class@anonymous` (PHP's name has a path + counter).
+- **Public API** = `Filo\Testing` + `Tracer::cycle()` + CLI, env vars, file
+  formats and the HTTP API (README "Public API"). Every other class is
+  `@internal` — mark new src classes too.
 - **Traces always live in `<project>/.filo/traces`** (breaks in `…/breaks`),
   via `Tracer::outputDir()` — the only place that knows the path. Not
   configurable by design; `.filo/` must be gitignored.
@@ -124,7 +127,7 @@ Arrow functions, native functions, eval'd code = caller self-time.
 
 1. ~~opcache coexistence~~ — done: opcache is disabled per traced request.
 2. ~~Exact line numbers~~ — done: hooks are spliced into the original source.
-3. Long-running runtime adapters (Octane/RoadRunner: `Collector::cycle()`).
+3. Long-running runtime adapters (Octane/RoadRunner: `Tracer::cycle()`).
 4. Sampling mode (instrument N% of requests) for staging.
 5. Designed web UI from Claude Design: drop exported files into server/ui/
    (served automatically, flat dir, extension whitelist in server/index.php).

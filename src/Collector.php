@@ -8,6 +8,8 @@ namespace Filo;
  * Runtime hot path. enter()/leave() are called for EVERY instrumented
  * function call, so: static properties, flat arrays, no objects, no
  * allocations beyond the event row itself.
+ *
+ * @internal Not part of the public API (README "Public API").
  */
 final class Collector
 {

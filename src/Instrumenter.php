@@ -16,6 +16,8 @@ use Throwable;
  *
  * Returns null on any failure — the wrapper then serves the ORIGINAL
  * file, so a parse error in exotic code can never take the app down.
+ *
+ * @internal Not part of the public API (README "Public API").
  */
 final class Instrumenter
 {

@@ -262,6 +262,19 @@ changes. The UI must call the JSON API with relative paths
 (`/api/traces`, `/api/breaks`, `/api/breakpoints`; contract documented
 at the top of `server/index.php`). Delete `server/ui/` to fall back.
 
+## Public API
+
+From 1.0, semver covers:
+
+- everything in `Filo\Testing` (except members marked `@internal`)
+- `Filo\Tracer::cycle()`
+- the CLI commands, the env vars and the `.filo-on` marker
+- the file formats: `.filo/breakpoints.json` and the trace format above
+- the viewer's HTTP API (contract at the top of `server/index.php`)
+
+Every other class and member is marked `@internal` and may change in any
+release.
+
 ## Known limitations (v1, by design)
 
 - Files preloaded with `opcache.preload` never pass through the
@@ -271,8 +284,9 @@ at the top of `server/index.php`). Delete `server/ui/` to fall back.
   `vendor/giacomomasseron/filo/bootstrap.php` for full coverage.
 - Native functions, `eval`'d code and arrow functions show up as
   self-time of their caller.
-- Long-running runtimes: call `\Filo\Collector::cycle($dir)` per
-  request instead of relying on shutdown flush.
+- Long-running runtimes (Octane, RoadRunner, FrankenPHP workers): call
+  `\Filo\Tracer::cycle()` at the end of each request instead of relying
+  on the shutdown flush. It does nothing while tracing is off.
 - Closures inside anonymous classes are named
   `{closure:class@anonymous::method():12}`; PHP 8.4's own name for them
   also embeds the file path and a compile counter.

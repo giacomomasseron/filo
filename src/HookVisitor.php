@@ -65,6 +65,8 @@ use RuntimeException;
  *    iteration), not at call time; leave() fires when the generator
  *    completes or is destroyed. The duration is "generator lifetime",
  *    which is the honest number anyway.
+ *
+ * @internal Not part of the public API (README "Public API").
  */
 final class HookVisitor extends NodeVisitorAbstract
 {

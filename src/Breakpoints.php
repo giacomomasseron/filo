@@ -13,6 +13,8 @@ namespace Filo;
  * enabled `fn` entries can fire — see Debugger.
  *
  * Dependency-free: bin/filo and server/index.php load it without Composer.
+ *
+ * @internal The FILE format is public (README "Breakpoints"); this class is not.
  */
 final class Breakpoints
 {
