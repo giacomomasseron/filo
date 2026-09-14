@@ -227,8 +227,9 @@ Rules of engagement:
   the timeline clock stops, so breakpoints don't pollute your
   flamegraph.
 - Breakpoints live in `.filo/breakpoints.json` in the project root;
-  paused-request snapshots in `<output>/breaks/`. The web UI reads and
-  writes the same files — the CLI and UI are interchangeable.
+  paused-request snapshots in `.filo/traces/breaks/`. The web UI reads
+  and writes the same files, so the CLI and UI are interchangeable (the
+  CLI leaves the UI's disabled and file:line entries alone).
 
 ## Web viewer
 

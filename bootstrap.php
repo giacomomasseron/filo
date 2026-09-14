@@ -54,6 +54,7 @@ define('FILO_BOOTSTRAPPED', true);
  */
 require_once __DIR__ . '/src/Collector.php';
 require_once __DIR__ . '/src/VarExporter.php';
+require_once __DIR__ . '/src/Breakpoints.php';
 require_once __DIR__ . '/src/Debugger.php';
 require_once __DIR__ . '/src/Instrumenter.php';
 require_once __DIR__ . '/src/HookVisitor.php';

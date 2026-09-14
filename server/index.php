@@ -36,10 +36,11 @@ declare(strict_types=1);
  */
 
 require_once dirname(__DIR__) . '/src/Tracer.php';
+require_once dirname(__DIR__) . '/src/Breakpoints.php';
 $root      = \Filo\Tracer::findProjectRoot();
 $outputDir = \Filo\Tracer::outputDir($root);
 $breaksDir = $outputDir . '/breaks';
-$bpFile    = $root . '/.filo/breakpoints.json';
+$bpFile    = \Filo\Breakpoints::file($root);
 
 $path   = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
@@ -116,51 +117,16 @@ if (preg_match('#^/api/breaks/([A-Za-z0-9-]+)/continue$#', $path, $m) && $method
 }
 
 // ── /api/breakpoints ──────────────────────────────────────────────────
-/** Accepts a string ("App\\Foo::bar") or an object; returns the canonical object or null. */
-$normalizeBp = static function (mixed $item): ?array {
-    if (is_string($item)) {
-        $item = ['fn' => $item];
-    }
-    if (!is_array($item)) {
-        return null;
-    }
-    $fn   = isset($item['fn']) && is_string($item['fn']) ? trim($item['fn']) : '';
-    $file = isset($item['file']) && is_string($item['file']) ? trim($item['file']) : '';
-    $line = isset($item['line']) && is_numeric($item['line']) ? (int) $item['line'] : 0;
-    if ($fn === '' && ($file === '' || $line <= 0)) {
-        return null;
-    }
-    $out = ['id' => isset($item['id']) && is_string($item['id']) && $item['id'] !== ''
-        ? $item['id']
-        : 'bp_' . substr(md5($fn !== '' ? $fn : $file . ':' . $line), 0, 8)];
-    if ($fn !== '') {
-        $out['fn'] = $fn;
-    } else {
-        $out['file'] = $file;
-        $out['line'] = $line;
-    }
-    $out['enabled'] = !array_key_exists('enabled', $item) || (bool) $item['enabled'];
-
-    return $out;
-};
-
-$readBps = static function () use ($bpFile, $normalizeBp): array {
-    $cfg = is_file($bpFile) ? json_decode((string) file_get_contents($bpFile), true) : null;
-    $raw = is_array($cfg) ? ($cfg['breakpoints'] ?? $cfg) : [];
-
-    return array_values(array_filter(array_map($normalizeBp, (array) $raw)));
-};
-
+// Read/written through Filo\Breakpoints, shared with bin/filo.
 if ($path === '/api/breakpoints' && $method === 'GET') {
-    $json($readBps());
+    $json(\Filo\Breakpoints::read($bpFile));
 }
 
 if ($path === '/api/breakpoints' && $method === 'PUT') {
     $body = json_decode((string) file_get_contents('php://input'), true);
     $raw  = is_array($body) ? ($body['breakpoints'] ?? $body) : [];
-    $list = array_values(array_filter(array_map($normalizeBp, (array) $raw)));
-    is_dir(dirname($bpFile)) || @mkdir(dirname($bpFile), 0777, true);
-    file_put_contents($bpFile, json_encode(['breakpoints' => $list], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
+    $list = array_values(array_filter(array_map(\Filo\Breakpoints::normalize(...), (array) $raw)));
+    \Filo\Breakpoints::write($bpFile, $list);
     $json($list);
 }
 

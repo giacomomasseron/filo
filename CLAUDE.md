@@ -57,6 +57,8 @@ namespace `Filo\`, PHP ^8.1. "filo" = Italian for thread (Ariadne's thread).
   quarter of memory_limit (~600 B/event incl. flush JSON), and recording
   stops once the process passes 90% of it. `enter()` checks both only when
   `($id & 1023) === 0` — reading the static caps on every call cost ~7%.
+- **breakpoints.json has one reader/writer**: `Filo\Breakpoints`, shared by
+  bin/filo, server/index.php and Debugger. Parse it nowhere else.
 - **Pause time and cache-miss instrumentation time are excluded from
   traces** via `Collector::excludePause()` (epoch shift; callers: `Debugger`,
   `IncludeStreamWrapper::instrumentedCode()`). Don't "fix" timings by

@@ -20,9 +20,12 @@ declare(strict_types=1);
  */
 
 require_once dirname(__DIR__) . '/src/Tracer.php';
+require_once dirname(__DIR__) . '/src/Breakpoints.php';
+
+use Filo\Breakpoints;
 
 $root      = \Filo\Tracer::findProjectRoot();
-$bpFile    = $root . '/.filo/breakpoints.json';
+$bpFile    = Breakpoints::file($root);
 $outputDir = \Filo\Tracer::outputDir($root);
 $breaksDir = rtrim($outputDir, '/') . '/breaks';
 
@@ -32,35 +35,6 @@ $arg = $argv[2] ?? null;
 $die = static function (string $msg): never {
     fwrite(STDERR, $msg);
     exit(1);
-};
-
-$loadBp = static function () use ($bpFile): array {
-    if (!is_file($bpFile)) {
-        return [];
-    }
-    $cfg = json_decode((string) file_get_contents($bpFile), true);
-    $out = [];
-    foreach ((array) ($cfg['breakpoints'] ?? []) as $entry) {
-        // Web UI stores {id, fn, enabled} objects; the CLI stores plain names.
-        if (is_array($entry)) {
-            $entry = ($entry['enabled'] ?? true) === false ? null : ($entry['fn'] ?? null);
-        }
-        if (is_string($entry) && $entry !== '') {
-            $out[] = $entry;
-        }
-    }
-
-    return array_values(array_unique($out));
-};
-
-$saveBp = static function (array $list) use ($bpFile): void {
-    if (!is_dir(dirname($bpFile))) {
-        mkdir(dirname($bpFile), 0777, true);
-    }
-    file_put_contents($bpFile, json_encode(
-        ['breakpoints' => array_values(array_unique($list))],
-        JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES,
-    ) . "\n");
 };
 
 $pending = static function () use ($breaksDir): array {
@@ -77,20 +51,44 @@ $pending = static function () use ($breaksDir): array {
 };
 
 switch ($cmd) {
+    // Every command keeps entries it doesn't touch as they are: the web UI
+    // writes disabled and file:line breakpoints to the same file.
     case 'breaks':
-        $list = $loadBp();
-        echo $list === [] ? "no breakpoints configured ({$bpFile})\n" : implode("\n", $list) . "\n";
+        $list = Breakpoints::read($bpFile);
+        if ($list === []) {
+            echo "no breakpoints configured ({$bpFile})\n";
+            break;
+        }
+        foreach ($list as $bp) {
+            echo $bp['fn'] ?? $bp['file'] . ':' . $bp['line'], $bp['enabled'] ? '' : '  (disabled)', "\n";
+        }
         break;
 
     case 'break':
-        $arg !== null || $die("usage: filo break \"App\\Foo::bar\"\n");
-        $saveBp([...$loadBp(), $arg]);
-        echo "breakpoint added: {$arg}\n";
+        $entry = Breakpoints::normalize($arg);
+        $entry !== null || $die("usage: filo break \"App\\Foo::bar\"\n");
+        $list  = Breakpoints::read($bpFile);
+        $found = false;
+        foreach ($list as &$bp) {
+            if (($bp['fn'] ?? null) === $entry['fn']) {
+                $bp['enabled'] = true;
+                $found         = true;
+            }
+        }
+        unset($bp);
+        if (!$found) {
+            $list[] = $entry;
+        }
+        Breakpoints::write($bpFile, $list);
+        echo "breakpoint added: {$entry['fn']}\n";
         break;
 
     case 'unbreak':
         $arg !== null || $die("usage: filo unbreak \"App\\Foo::bar\"\n");
-        $saveBp(array_filter($loadBp(), static fn (string $b): bool => $b !== $arg));
+        Breakpoints::write($bpFile, array_filter(
+            Breakpoints::read($bpFile),
+            static fn (array $bp): bool => ($bp['fn'] ?? null) !== $arg,
+        ));
         echo "breakpoint removed: {$arg}\n";
         break;
 

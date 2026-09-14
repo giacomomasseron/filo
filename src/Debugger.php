@@ -8,10 +8,10 @@ namespace Filo;
  * Function-entry breakpoints, zero-infrastructure edition.
  *
  * How it works:
- *  - Breakpoints live in <project>/.filo/breakpoints.json — a plain list
- *    of names matching what __METHOD__ yields at runtime
- *    ("App\Service\Foo::bar", "my_function"). Edited by `bin/filo`
- *    or the future web UI. Reloaded per request (init() / cycle()).
+ *  - Breakpoints live in <project>/.filo/breakpoints.json, read through
+ *    Filo\Breakpoints (shared with `bin/filo` and the viewer API). Names
+ *    match what __METHOD__ yields at runtime ("App\Service\Foo::bar",
+ *    "my_function"). Reloaded per request (init() / cycle()).
  *  - The instrumented code evaluates `Debugger::$armed && Debugger::hit(__METHOD__)`
  *    at every function entry — a single static property read when
  *    disarmed; the call only happens when breakpoints exist.
@@ -60,30 +60,12 @@ final class Debugger
     {
         self::$hits = [];
 
-        $file = self::$projectRoot . '/.filo/breakpoints.json';
-        if (!is_file($file)) {
-            self::$armed = false;
-
-            return;
-        }
-
-        $config = json_decode((string) @file_get_contents($file), true);
-        $names  = $config['breakpoints'] ?? [];
-
-        // Entries are either "Class::method" strings (bin/filo) or objects
-        // {id, fn, enabled} written by the web UI. Only enabled `fn`
-        // entries arm; {file, line} entries can't fire in an entry-only
-        // debugger and are ignored here (the UI still lists them).
+        // Only enabled `fn` entries arm; {file, line} entries can't fire in
+        // an entry-only debugger and are ignored here (the UI still lists them).
         self::$breakpoints = [];
-        foreach ((array) $names as $entry) {
-            if (is_array($entry)) {
-                if (($entry['enabled'] ?? true) === false) {
-                    continue;
-                }
-                $entry = $entry['fn'] ?? null;
-            }
-            if (is_string($entry) && $entry !== '') {
-                self::$breakpoints[$entry] = true;
+        foreach (Breakpoints::read(Breakpoints::file(self::$projectRoot)) as $bp) {
+            if ($bp['enabled'] && isset($bp['fn'])) {
+                self::$breakpoints[$bp['fn']] = true;
             }
         }
 
