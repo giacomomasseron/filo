@@ -1,0 +1,67 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://giacomomasseron.github.io/filo/trace-v1.schema.json",
+    "title": "filo trace, format v1",
+    "description": "One traced request, CLI run, test or capture, as written to <project>/.filo/traces and served by the viewer API. Within v1, new optional properties may be added: consumers must ignore properties they don't know.",
+    "type": "object",
+    "required": ["version", "ts", "duration", "capped", "context", "events"],
+    "properties": {
+        "version": {
+            "description": "Format version.",
+            "enum": [1]
+        },
+        "ts": {
+            "description": "When the trace was written, ISO 8601 (PHP date('c')).",
+            "type": "string"
+        },
+        "duration": {
+            "description": "Wall time in nanoseconds, breakpoint pauses and filo's own instrumentation excluded.",
+            "type": "integer",
+            "minimum": 0
+        },
+        "capped": {
+            "description": "True when filo stopped recording part-way (event budget or memory_limit), so the events are incomplete.",
+            "type": "boolean"
+        },
+        "context": {
+            "description": "Where the trace came from. Web requests set method and uri, CLI runs argv, per-test artifacts test and status, Recorder captures capture.",
+            "type": "object",
+            "required": ["sapi"],
+            "properties": {
+                "sapi": { "description": "PHP_SAPI of the traced process.", "type": "string" },
+                "method": { "description": "HTTP method.", "type": ["string", "null"] },
+                "uri": { "description": "Request URI.", "type": ["string", "null"] },
+                "argv": { "description": "CLI arguments.", "type": "array", "items": { "type": "string" } },
+                "test": { "description": "Class::method of the test (per-test artifacts).", "type": "string" },
+                "status": { "description": "Why a per-test artifact was written.", "enum": ["failed", "traced"] },
+                "capture": { "description": "Set by Filo\\Testing\\Trace::toArray().", "type": "boolean" }
+            }
+        },
+        "events": {
+            "description": "One per instrumented call, in call order.",
+            "type": "array",
+            "items": { "$ref": "#/definitions/event" }
+        },
+        "name": {
+            "description": "Added by the viewer API (GET /api/traces), never stored: the file name under .filo/traces, e.g. \"tests/App_FooTest__testBar.json\".",
+            "type": "string"
+        }
+    },
+    "definitions": {
+        "event": {
+            "type": "object",
+            "required": ["i", "p", "fn", "file", "line", "s", "e", "m"],
+            "additionalProperties": false,
+            "properties": {
+                "i": { "description": "Event id, unique within the trace.", "type": "integer", "minimum": 0 },
+                "p": { "description": "Parent event id; -1 for a root.", "type": "integer", "minimum": -1 },
+                "fn": { "description": "Function name: __METHOD__ for functions and methods (\"App\\\\Repo::find\"), {closure:<scope>:<line>} for closures.", "type": "string" },
+                "file": { "description": "Path of the source file.", "type": "string" },
+                "line": { "description": "Line where the function starts.", "type": "integer", "minimum": 1 },
+                "s": { "description": "Start, in ns from the start of the trace.", "type": "integer", "minimum": 0 },
+                "e": { "description": "End, in ns from the start of the trace. Self time = (e - s) minus the children's (e - s).", "type": "integer", "minimum": 0 },
+                "m": { "description": "memory_get_usage() at entry, in bytes.", "type": "integer", "minimum": 0 }
+            }
+        }
+    }
+}

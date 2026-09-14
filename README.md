@@ -200,6 +200,10 @@ incomplete. That happens after 500k events, once events fill a quarter of
 `memory_limit`, or once the whole process passes 90% of `memory_limit`.
 Tracing can't be what runs a request out of memory.
 
+The full contract is the JSON Schema in
+[`docs/trace-v1.schema.json`](docs/trace-v1.schema.json), also published at
+`https://giacomomasseron.github.io/filo/trace-v1.schema.json`.
+
 ## Breakpoints
 
 Function-entry breakpoints, controlled by files — no daemon, no IDE

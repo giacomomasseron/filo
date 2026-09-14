@@ -51,6 +51,9 @@ namespace `Filo\`, PHP ^8.1. "filo" = Italian for thread (Ariadne's thread).
 - **Public API** = `Filo\Testing` + `Tracer::cycle()` + CLI, env vars, file
   formats and the HTTP API (README "Public API"). Every other class is
   `@internal` — mark new src classes too.
+- **Trace format contract** = `docs/trace-v1.schema.json`, validated against
+  every producer by `TraceSchemaTest`. Changing a field ⇒ change the schema
+  (additive only within v1).
 - **Traces always live in `<project>/.filo/traces`** (breaks in `…/breaks`),
   via `Tracer::outputDir()` — the only place that knows the path. Not
   configurable by design; `.filo/` must be gitignored.
@@ -113,7 +116,8 @@ namespace `Filo\`, PHP ^8.1. "filo" = Italian for thread (Ariadne's thread).
   JSON API (contract in its header comment) + placeholder HTML. A designed
   UI (being produced in Claude Design) will replace the HTML, never the API.
 - Trace format v1: flat events `{i,p,fn,file,line,s,e,m}`, ns offsets;
-  see README "Trace format". `examples/sample-trace.json` is the fixture.
+  see README "Trace format". `examples/sample-trace.json` is the fixture;
+  `docs/trace-v1.schema.json` (published via GitHub Pages) is the contract.
 
 ## Known limitations (documented, not bugs)
 
