@@ -230,6 +230,8 @@ Rules of engagement:
   paused-request snapshots in `.filo/traces/breaks/`. The web UI reads
   and writes the same files, so the CLI and UI are interchangeable (the
   CLI leaves the UI's disabled and file:line entries alone).
+- Arguments marked `#[\SensitiveParameter]` appear in snapshots as
+  `[SensitiveParameter]`, never with their value.
 
 ## Web viewer
 
@@ -240,7 +242,9 @@ vendor/bin/filo serve        # http://127.0.0.1:8090
 A zero-dependency local viewer (PHP built-in server, single file):
 trace list, call tree with self-times, top-functions table, and live
 paused-request panel with continue buttons. Localhost-only by design —
-traces contain paths and variable values; never expose the port.
+traces contain paths and variable values; never expose the port. Requests
+whose `Host` isn't `127.0.0.1`, `localhost` or `[::1]` are refused, which
+blocks DNS-rebinding attacks from pages open in your browser.
 
 The built-in page is a functional placeholder. To install a designed UI
 (e.g. exported from Claude Design), copy its files into `server/ui/`

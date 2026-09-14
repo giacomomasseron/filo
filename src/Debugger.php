@@ -85,9 +85,10 @@ final class Debugger
     /**
      * Freeze this request: write the snapshot, poll for release.
      *
-     * @param array<string, mixed> $vars from get_defined_vars() (+ __this)
+     * @param array<string, mixed> $vars      from get_defined_vars() (+ __this)
+     * @param list<string>         $sensitive #[\SensitiveParameter] names, never exported
      */
-    public static function pause(string $fn, array $vars, string $file, int $line): void
+    public static function pause(string $fn, array $vars, string $file, int $line, array $sensitive = []): void
     {
         self::$hits[$fn] = true;
 
@@ -114,7 +115,7 @@ final class Debugger
             'ts'    => date('c'),
             'pid'   => getmypid(),
             'uri'   => $_SERVER['REQUEST_URI'] ?? implode(' ', $_SERVER['argv'] ?? []),
-            'vars'  => VarExporter::snapshot($vars),
+            'vars'  => VarExporter::snapshot($vars, $sensitive),
         ], JSON_PRETTY_PRINT | JSON_INVALID_UTF8_SUBSTITUTE));
 
         // Fail open: no snapshot means nobody can see or release this

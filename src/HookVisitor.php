@@ -57,6 +57,8 @@ use PhpParser\NodeVisitorAbstract;
  *  - Breakpoints are ENTRY breakpoints: get_defined_vars() at the top
  *    of the body captures the arguments. For non-static methods we also
  *    pass ['__this' => $this]; static context and closures skip it.
+ *    Parameters marked #[\SensitiveParameter] are named in a 5th pause()
+ *    argument so their values never reach a snapshot.
  *  - The disarmed cost is one static property read (Debugger::$armed);
  *    hit() is only called when breakpoints exist, and get_defined_vars()
  *    (which copies) only runs inside the taken branch.
@@ -111,24 +113,22 @@ final class HookVisitor extends NodeVisitorAbstract
             );
         }
 
+        $pauseArgs = [new Arg(new Method()), new Arg($varsExpr), new Arg(new File()), new Arg($line)];
+        $sensitive = self::sensitiveParams($node);
+        if ($sensitive !== []) {
+            $pauseArgs[] = new Arg(new Array_(array_map(
+                static fn (string $name): ArrayItem => new ArrayItem(new String_($name)),
+                $sensitive,
+            )));
+        }
+
         $breakCheck = new If_(
             new BooleanAnd(
                 new StaticPropertyFetch(new FullyQualified(self::DEBUGGER), 'armed'),
                 new StaticCall(new FullyQualified(self::DEBUGGER), 'hit', [new Arg(new Method())]),
             ),
             ['stmts' => [
-                new Expression(
-                    new StaticCall(
-                        new FullyQualified(self::DEBUGGER),
-                        'pause',
-                        [
-                            new Arg(new Method()),
-                            new Arg($varsExpr),
-                            new Arg(new File()),
-                            new Arg($line),
-                        ],
-                    ),
-                ),
+                new Expression(new StaticCall(new FullyQualified(self::DEBUGGER), 'pause', $pauseArgs)),
             ]],
         );
 
@@ -146,5 +146,29 @@ final class HookVisitor extends NodeVisitorAbstract
         ];
 
         return $node;
+    }
+
+    /**
+     * Names of the parameters marked #[\SensitiveParameter]. Matched on the
+     * last name segment, so imported and unqualified spellings count too.
+     *
+     * @return list<string>
+     */
+    private static function sensitiveParams(Function_|ClassMethod|Closure $node): array
+    {
+        $names = [];
+        foreach ($node->params as $param) {
+            foreach ($param->attrGroups as $group) {
+                foreach ($group->attrs as $attr) {
+                    if (strcasecmp($attr->name->getLast(), 'SensitiveParameter') === 0
+                        && $param->var instanceof Variable
+                        && is_string($param->var->name)) {
+                        $names[] = $param->var->name;
+                    }
+                }
+            }
+        }
+
+        return $names;
     }
 }

@@ -33,6 +33,9 @@ declare(strict_types=1);
  * header forces a CORS preflight, which this server never answers, so a
  * third-party page in the developer's browser can't release pauses or
  * rewrite breakpoints via a simple cross-origin request.
+ *
+ * Every request must carry a loopback Host (127.0.0.1, localhost, [::1],
+ * any port), or it gets 403: the DNS-rebinding guard.
  */
 
 require_once dirname(__DIR__) . '/src/Tracer.php';
@@ -51,6 +54,15 @@ $json = static function (mixed $data, int $code = 200): never {
     echo json_encode($data, JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
     exit;
 };
+
+// DNS-rebinding guard, before anything else: a page on a hostile domain can
+// re-point that domain at 127.0.0.1 and become same-origin with this server,
+// which defeats the X-Filo check below — but its Host header still carries
+// the hostile name. Loopback names only.
+$host = strtolower((string) preg_replace('/:\d+$/', '', (string) ($_SERVER['HTTP_HOST'] ?? '')));
+if (!in_array($host, ['127.0.0.1', 'localhost', '[::1]'], true)) {
+    $json(['error' => 'forbidden host'], 403);
+}
 
 // CSRF guard for anything that changes state (see header comment).
 if (str_starts_with($path, '/api/') && $method !== 'GET' && ($_SERVER['HTTP_X_FILO'] ?? '') !== '1') {

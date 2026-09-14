@@ -19,8 +19,14 @@ final class VarExporter
     private const MAX_ARRAY_ITEMS  = 25;
     private const MAX_STRING_BYTES = 2048;
 
-    /** @param array<string, mixed> $vars */
-    public static function snapshot(array $vars): array
+    /** Stands in for the value of a #[\SensitiveParameter] argument. */
+    private const REDACTED = '[SensitiveParameter]';
+
+    /**
+     * @param array<string, mixed> $vars
+     * @param list<string>         $sensitive names whose values are never exported
+     */
+    public static function snapshot(array $vars, array $sensitive = []): array
     {
         // The injected hook's own local ($__trc, see HookVisitor) is in
         // scope when get_defined_vars() runs — never show it to users.
@@ -28,7 +34,7 @@ final class VarExporter
 
         $out = [];
         foreach ($vars as $name => $value) {
-            $out[$name] = self::export($value, self::MAX_DEPTH);
+            $out[$name] = in_array($name, $sensitive, true) ? self::REDACTED : self::export($value, self::MAX_DEPTH);
         }
 
         return $out;

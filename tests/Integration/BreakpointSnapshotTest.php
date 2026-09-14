@@ -59,6 +59,22 @@ function pauseAndSnapshot(string|array $breakpoint, string $functions, string $c
     return [$snapshot, $out];
 }
 
+test('a breakpoint snapshot never contains #[SensitiveParameter] values', function (): void {
+    [$snapshot, $out] = pauseAndSnapshot(
+        'filo_bp_login',
+        'function filo_bp_login(string $user, #[\SensitiveParameter] string $password): string { return "ok"; }',
+        "filo_bp_login('bob', 'hunter2')",
+    );
+
+    expect($snapshot)->not->toBeNull('the breakpoint never paused: ' . $out)
+        ->and($out)->toBe('ok');
+
+    $vars = json_decode($snapshot, true)['vars'];
+    expect($vars['user'])->toBe('bob')
+        ->and($vars)->toHaveKey('password')
+        ->and($snapshot)->not->toContain('hunter2');
+});
+
 test('an enabled breakpoint in the web UI format pauses', function (): void {
     [$snapshot, $out] = pauseAndSnapshot(
         ['id' => 'bp_ui', 'fn' => 'filo_bp_ui', 'enabled' => true],

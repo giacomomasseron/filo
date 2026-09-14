@@ -72,6 +72,18 @@ test('mutating endpoints require X-Filo', function (): void {
     expect($status)->toBe(200)->and($body)->toBe(['ok' => true]);
 });
 
+test('only requests addressed to a loopback host are served', function (): void {
+    // DNS rebinding: a hostile page re-points its own hostname at 127.0.0.1
+    // and becomes same-origin with the viewer; its Host header still says so.
+    $port = parse_url(ApiServer::$base, PHP_URL_PORT);
+
+    [$status] = ApiServer::call('GET', '/api/breaks', null, ["Host: attacker.example:$port"]);
+    expect($status)->toBe(403);
+
+    [$status] = ApiServer::call('GET', '/api/breaks', null, ["Host: localhost:$port"]);
+    expect($status)->toBe(200);
+});
+
 test('breakpoints round-trip in the UI shape', function (): void {
     [$status, $body] = ApiServer::call('GET', '/api/breakpoints');
     expect($status)->toBe(200)->and($body)->toBe([]);

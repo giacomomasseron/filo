@@ -19,7 +19,7 @@ use Throwable;
 final class Instrumenter
 {
     /** Part of the cache key: bump when the transform changes. */
-    public const VERSION = '3';
+    public const VERSION = '4';
 
     public static function instrument(string $source): ?string
     {
