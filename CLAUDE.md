@@ -53,6 +53,10 @@ namespace `Filo\`, PHP ^8.1. "filo" = Italian for thread (Ariadne's thread).
   instrumented code gets cached for untraced requests to run. Covered by
   `tests/Integration/OpcacheTest.php` (php -S shares one opcache like FPM;
   it needs `opcache.file_update_protection=0` for fresh fixture files).
+- **Collector caps are fail-open and amortized**: events get at most a
+  quarter of memory_limit (~600 B/event incl. flush JSON), and recording
+  stops once the process passes 90% of it. `enter()` checks both only when
+  `($id & 1023) === 0` — reading the static caps on every call cost ~7%.
 - **Pause time and cache-miss instrumentation time are excluded from
   traces** via `Collector::excludePause()` (epoch shift; callers: `Debugger`,
   `IncludeStreamWrapper::instrumentedCode()`). Don't "fix" timings by

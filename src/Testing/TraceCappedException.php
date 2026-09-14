@@ -13,7 +13,7 @@ final class TraceCappedException extends \RuntimeException
     public static function create(): self
     {
         return new self(
-            'the collector hit its event cap (500000) during this run, so call counts '
+            'the collector hit its event cap (500000, or less under a tight memory_limit) during this run, so call counts '
             . 'are unreliable; reset per test via TraceExtension or reduce the captured scope',
         );
     }

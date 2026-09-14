@@ -11,7 +11,27 @@ namespace Filo;
  */
 final class Collector
 {
-    private const MAX_EVENTS = 500_000; // hard cap: runaway loops can't eat all memory
+    /** Absolute ceiling on recorded events, whatever memory_limit allows. */
+    private const MAX_EVENTS = 500_000;
+
+    /**
+     * What one recorded event costs: its row (~420 B measured) plus its
+     * share of the JSON built at flush (~150 B), rounded up.
+     */
+    private const BYTES_PER_EVENT = 600;
+
+    /** Events may use at most this fraction of memory_limit. */
+    private const MEMORY_SHARE = 0.25;
+
+    /** Stop recording once the whole process uses this share of memory_limit. */
+    private const MEMORY_CEILING = 0.9;
+
+    /** enter() checks the caps when ($id & mask) === 0, i.e. every 1024 events. */
+    private const CAP_CHECK_MASK = 1023;
+
+    /** Per-run caps, derived from memory_limit by begin(). */
+    private static int $maxEvents     = self::MAX_EVENTS;
+    private static int $memoryCeiling = PHP_INT_MAX;
 
     /** @var array<int, array{i:int,p:int,fn:string,file:string,line:int,s:int,e:int,m:int}> */
     private static array $events = [];
@@ -30,6 +50,33 @@ final class Collector
         self::$nextId = 0;
         self::$capped = false;
         self::$t0     = hrtime(true);
+
+        /*
+         * Fail open: recording must never be what exhausts memory_limit (a
+         * 500k-event trace is ~200 MB of rows, more than a default 128M).
+         * Events get at most a quarter of the limit (128M -> ~55k events),
+         * and nothing more is recorded once the process — app included —
+         * passes 90% of it. Unlimited -> MAX_EVENTS only.
+         */
+        $limit = self::iniBytes((string) ini_get('memory_limit'));
+        self::$maxEvents     = $limit > 0
+            ? (int) min(self::MAX_EVENTS, $limit * self::MEMORY_SHARE / self::BYTES_PER_EVENT)
+            : self::MAX_EVENTS;
+        self::$memoryCeiling = $limit > 0 ? (int) ($limit * self::MEMORY_CEILING) : PHP_INT_MAX;
+    }
+
+    /** php.ini quantity ("128M", "1G", "-1") to bytes; <= 0 means unlimited. */
+    private static function iniBytes(string $value): int
+    {
+        $value = trim($value);
+        $n     = (int) $value;
+
+        return match (strtolower(substr($value, -1))) {
+            'g'     => $n * 1024 ** 3,
+            'm'     => $n * 1024 ** 2,
+            'k'     => $n * 1024,
+            default => $n,
+        };
     }
 
     /**
@@ -43,7 +90,9 @@ final class Collector
 
         $id = self::$nextId++;
 
-        if ($id >= self::MAX_EVENTS) {
+        // Caps are checked once every 1024 events: at most ~400 KB of
+        // overshoot, and no static reads on the other 1023 calls.
+        if (($id & self::CAP_CHECK_MASK) === 0 && self::overCap($id)) {
             self::$capped = true;
 
             return -1;
@@ -62,6 +111,12 @@ final class Collector
         self::$stack[] = $id;
 
         return $id;
+    }
+
+    /** Event budget used up, or the process (app included) near memory_limit. */
+    private static function overCap(int $id): bool
+    {
+        return $id >= self::$maxEvents || memory_get_usage() > self::$memoryCeiling;
     }
 
     public static function leave(int $id): void

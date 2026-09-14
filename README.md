@@ -177,6 +177,7 @@ Download the artifact, drop it into `.filo/traces/`, run `vendor/bin/filo serve`
 {
   "version": 1,
   "duration": 12345678,          // ns
+  "capped": false,
   "context": { "method": "GET", "uri": "/orders" },
   "events": [
     { "i": 0, "p": -1, "fn": "App\\Http\\Kernel::handle",
@@ -188,6 +189,11 @@ Download the artifact, drop it into `.filo/traces/`, run `vendor/bin/filo serve`
 
 `p` is the parent event id (`-1` = root). `s`/`e` are start/end offsets
 in ns from request start. Self-time of a frame = `(e - s) - Σ children`.
+
+`capped: true` means filo stopped recording part-way, so the trace is
+incomplete. That happens after 500k events, once events fill a quarter of
+`memory_limit`, or once the whole process passes 90% of `memory_limit`.
+Tracing can't be what runs a request out of memory.
 
 ## Breakpoints
 
