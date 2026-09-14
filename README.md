@@ -5,7 +5,8 @@
 [![Total Downloads](https://img.shields.io/packagist/dt/giacomomasseron/filo.svg?style=flat-square)](https://packagist.org/packages/giacomomasseron/filo)
 
 Zero-extension PHP call tracer. Userland instrumentation via a `file://`
-stream wrapper + AST rewriting (nikic/php-parser). Original files are
+stream wrapper that splices hooks into your code as it loads (parsed with
+nikic/php-parser), keeping every line where it was. Original files are
 never modified; instrumented copies live only in a throwaway cache.
 
 <p align="center"><a href="https://giacomomasseron.github.io/filo/"><strong>Documentation</strong></a></p>
@@ -263,8 +264,5 @@ at the top of `server/index.php`). Delete `server/ui/` to fall back.
   `vendor/giacomomasseron/filo/bootstrap.php` for full coverage.
 - Native functions, `eval`'d code and arrow functions show up as
   self-time of their caller.
-- Line numbers inside instrumented files drift (standard pretty
-  printer); trace line numbers are correct — they're baked in from the
-  original AST.
 - Long-running runtimes: call `\Filo\Collector::cycle($dir)` per
   request instead of relying on shutdown flush.

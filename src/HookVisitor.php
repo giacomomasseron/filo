@@ -5,55 +5,36 @@ declare(strict_types=1);
 namespace Filo;
 
 use PhpParser\Node;
-use PhpParser\Node\Arg;
-use PhpParser\Node\ArrayItem;
-use PhpParser\Node\Expr\Array_;
-use PhpParser\Node\Expr\Assign;
-use PhpParser\Node\Expr\BinaryOp\BooleanAnd;
-use PhpParser\Node\Expr\BinaryOp\Plus;
 use PhpParser\Node\Expr\Closure;
-use PhpParser\Node\Expr\FuncCall;
-use PhpParser\Node\Expr\StaticCall;
-use PhpParser\Node\Expr\StaticPropertyFetch;
 use PhpParser\Node\Expr\Variable;
-use PhpParser\Node\Name;
-use PhpParser\Node\Name\FullyQualified;
-use PhpParser\Node\Scalar\Int_;
-use PhpParser\Node\Scalar\MagicConst\File;
-use PhpParser\Node\Scalar\MagicConst\Method;
-use PhpParser\Node\Scalar\String_;
 use PhpParser\Node\Stmt\ClassMethod;
-use PhpParser\Node\Stmt\Expression;
-use PhpParser\Node\Stmt\Finally_;
 use PhpParser\Node\Stmt\Function_;
-use PhpParser\Node\Stmt\If_;
-use PhpParser\Node\Stmt\TryCatch;
 use PhpParser\NodeVisitorAbstract;
+use PhpParser\Token;
+use RuntimeException;
 
 /**
- * Transforms
+ * Plans the hooks for every function, method and closure body as two text
+ * insertions into the ORIGINAL source (Instrumenter applies them):
  *
- *      function foo($x) { <body> }
+ *      function foo($x) {⟨prologue⟩ <body, untouched> ⟨epilogue⟩}
  *
- * into
+ *   prologue, right after the body's `{`:
+ *      $__trc = \Filo\Collector::enter(__METHOD__, __FILE__, 42); try {
+ *      if (\Filo\Debugger::$armed && \Filo\Debugger::hit(__METHOD__)) {
+ *      \Filo\Debugger::pause(__METHOD__, get_defined_vars(), __FILE__, 42); }
+ *   epilogue, right before the closing `}`:
+ *      } finally { \Filo\Collector::leave($__trc); }
  *
- *      function foo($x) {
- *          $__trc = \Filo\Collector::enter(__METHOD__, __FILE__, 42);
- *          try {
- *              if (\Filo\Debugger::$armed && \Filo\Debugger::hit(__METHOD__)) {
- *                  \Filo\Debugger::pause(__METHOD__, get_defined_vars(), __FILE__, 42);
- *              }
- *              <body>
- *          } finally { \Filo\Collector::leave($__trc); }
- *      }
+ * Neither contains a newline, so every line keeps its number: exception
+ * lines, __LINE__ and stack traces stay those of the source. Only columns
+ * on the two brace lines shift.
  *
  * Design notes:
  *  - __METHOD__ resolves at compile time to "Class::method" inside
- *    methods, the plain function name inside functions, and "{closure}"
- *    inside closures — so we never need to reconstruct names ourselves.
- *  - The line number is baked in as a literal from the ORIGINAL node
- *    (getStartLine()), so traces stay correct even though the pretty
- *    printer shifts lines.
+ *    methods and the plain function name inside functions, so we never
+ *    reconstruct those names ourselves.
+ *  - The line passed to enter()/pause() is the function's start line.
  *  - Breakpoints are ENTRY breakpoints: get_defined_vars() at the top
  *    of the body captures the arguments. For non-static methods we also
  *    pass ['__this' => $this]; static context and closures skip it.
@@ -66,10 +47,10 @@ use PhpParser\NodeVisitorAbstract;
  *    generator destruction — so timings can't leak open frames. The
  *    breakpoint check sits INSIDE the try so a throwing pause() (e.g.
  *    random_bytes() without an entropy source) can't leak a frame either.
- *  - Arrow functions (fn() => ...) are skipped in v1: they have no
- *    statement body to wrap. They appear as self-time of their caller,
- *    same as native functions.
- *  - Abstract/interface methods have $stmts === null -> skipped.
+ *  - Arrow functions (fn() => ...) are skipped: they have no statement
+ *    body to wrap. They appear as self-time of their caller, same as
+ *    native functions.
+ *  - Abstract/interface methods and empty bodies are skipped.
  *  - Generators: enter() fires when the body first executes (first
  *    iteration), not at call time; leave() fires when the generator
  *    completes or is destroyed. The duration is "generator lifetime",
@@ -77,11 +58,21 @@ use PhpParser\NodeVisitorAbstract;
  */
 final class HookVisitor extends NodeVisitorAbstract
 {
-    private const COLLECTOR = 'Filo\\Collector';
-    private const DEBUGGER  = 'Filo\\Debugger';
-    private const VAR       = '__trc';
+    /** @var list<array{int, string}> [byte offset in the source, text to insert there] */
+    private array $insertions = [];
 
-    public function leaveNode(Node $node): ?Node
+    /** @param array<int, Token> $tokens the parser's tokens for the same source */
+    public function __construct(private readonly array $tokens)
+    {
+    }
+
+    /** @return list<array{int, string}> */
+    public function insertions(): array
+    {
+        return $this->insertions;
+    }
+
+    public function enterNode(Node $node): ?Node
     {
         if (!$node instanceof Function_ && !$node instanceof ClassMethod && !$node instanceof Closure) {
             return null;
@@ -91,61 +82,59 @@ final class HookVisitor extends NodeVisitorAbstract
             return null; // abstract, interface, or empty body — nothing to time
         }
 
-        $line = new Int_($node->getStartLine());
+        [$open, $close] = $this->bodyBraces($node);
 
-        $enter = new Expression(
-            new Assign(
-                new Variable(self::VAR),
-                new StaticCall(
-                    new FullyQualified(self::COLLECTOR),
-                    'enter',
-                    [new Arg(new Method()), new Arg(new File()), new Arg($line)],
-                ),
-            ),
-        );
-
-        // get_defined_vars() [+ ['__this' => $this] for non-static methods]
-        $varsExpr = new FuncCall(new Name('get_defined_vars'));
+        $fn   = '__METHOD__';
+        $line = $node->getStartLine();
+        $vars = 'get_defined_vars()';
         if ($node instanceof ClassMethod && !$node->isStatic()) {
-            $varsExpr = new Plus(
-                $varsExpr,
-                new Array_([new ArrayItem(new Variable('this'), new String_('__this'))]),
-            );
+            $vars .= " + ['__this' => \$this]";
         }
-
-        $pauseArgs = [new Arg(new Method()), new Arg($varsExpr), new Arg(new File()), new Arg($line)];
         $sensitive = self::sensitiveParams($node);
         if ($sensitive !== []) {
-            $pauseArgs[] = new Arg(new Array_(array_map(
-                static fn (string $name): ArrayItem => new ArrayItem(new String_($name)),
+            $vars .= ', __FILE__, ' . $line . ', [' . implode(', ', array_map(
+                static fn (string $name): string => var_export($name, true),
                 $sensitive,
-            )));
+            )) . ']';
+        } else {
+            $vars .= ', __FILE__, ' . $line;
         }
 
-        $breakCheck = new If_(
-            new BooleanAnd(
-                new StaticPropertyFetch(new FullyQualified(self::DEBUGGER), 'armed'),
-                new StaticCall(new FullyQualified(self::DEBUGGER), 'hit', [new Arg(new Method())]),
-            ),
-            ['stmts' => [
-                new Expression(new StaticCall(new FullyQualified(self::DEBUGGER), 'pause', $pauseArgs)),
-            ]],
-        );
+        $this->insertions[] = [$open + 1, " \$__trc = \\Filo\\Collector::enter({$fn}, __FILE__, {$line}); try { "
+            . "if (\\Filo\\Debugger::\$armed && \\Filo\\Debugger::hit({$fn})) { "
+            . "\\Filo\\Debugger::pause({$fn}, {$vars}); } "];
+        $this->insertions[] = [$close, ' } finally { \Filo\Collector::leave($__trc); } '];
 
-        $leave = new Expression(
-            new StaticCall(
-                new FullyQualified(self::COLLECTOR),
-                'leave',
-                [new Arg(new Variable(self::VAR))],
-            ),
-        );
+        return null;
+    }
 
-        $node->stmts = [
-            $enter,
-            new TryCatch([$breakCheck, ...$node->stmts], [], new Finally_([$leave])),
-        ];
+    /**
+     * Byte offsets of the body's `{` and `}`. The node ends with its `}`;
+     * the matching `{` is found by counting braces backwards over the
+     * tokens, so closures in default values, "{$x}" in strings and nested
+     * bodies can't be mistaken for it. Throwing makes Instrumenter serve
+     * the original file.
+     *
+     * @return array{int, int}
+     */
+    private function bodyBraces(Function_|ClassMethod|Closure $node): array
+    {
+        $end = $node->getEndTokenPos();
+        if (($this->tokens[$end] ?? null)?->text !== '}') {
+            throw new RuntimeException('function body does not end with }');
+        }
 
-        return $node;
+        $depth = 0;
+        for ($i = $end; $i >= 0; $i--) {
+            $text = $this->tokens[$i]->text;
+            if ($text === '}') {
+                $depth++;
+            } elseif (($text === '{' || $text === '${') && --$depth === 0) {
+                return [$this->tokens[$i]->pos, $this->tokens[$end]->pos];
+            }
+        }
+
+        throw new RuntimeException('unbalanced braces');
     }
 
     /**

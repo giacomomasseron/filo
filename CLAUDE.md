@@ -1,9 +1,9 @@
 # CLAUDE.md — filo
 
 Zero-extension PHP call tracer (Xdebug alternative). Userland instrumentation:
-a `file://` stream wrapper intercepts every include, rewrites the AST
-(nikic/php-parser ^5) to inject timing/breakpoint hooks, and serves the
-modified source from memory. Original files are NEVER touched; instrumented
+a `file://` stream wrapper intercepts every include, parses it
+(nikic/php-parser ^5), splices timing/breakpoint hooks into the source text
+(never re-printed, so lines don't move), and serves the result from memory. Original files are NEVER touched; instrumented
 copies live only in a cache. Composer package `giacomomasseron/filo`,
 namespace `Filo\`, PHP ^8.1. "filo" = Italian for thread (Ariadne's thread).
 
@@ -16,13 +16,11 @@ namespace `Filo\`, PHP ^8.1. "filo" = Italian for thread (Ariadne's thread).
 3. `FILO_ENABLED=1 vendor/bin/pest` — all green
 4. `FILO_ENABLED=1 php -d opcache.enable_cli=0 examples/smoke.php` — must print 3 PASS lines
 5. Known-risk spots, in order of suspicion:
-   - php-parser v5 API names in `src/HookVisitor.php` (`ArrayItem` moved out of
-     `Expr\` in v5; `Int_` was `LNumber` in v4) and `Instrumenter.php`
-     (`createForHostVersion()`)
+   - token brace matching in `HookVisitor::bodyBraces()` and `Instrumenter`'s
+     re-parse of the spliced source (`createForHostVersion()`)
    - `STREAM_OPEN_FOR_INCLUDE` (value 128) actually firing in
      `IncludeStreamWrapper::stream_open()` on the target SAPI
    - `stream_stat()` on the `php://memory` handle serving instrumented includes
-   - `If_` node construction args in `HookVisitor` (named-ish `['stmts' => …]` subnode array)
 6. Breakpoints end-to-end: `examples/break-demo.php` (two terminals, see its header)
 7. `vendor/bin/filo serve` — the inline JS in `server/index.php` is untested;
    verify trace list renders, call tree expands, continue button releases a pause
@@ -41,6 +39,10 @@ namespace `Filo\`, PHP ^8.1. "filo" = Italian for thread (Ariadne's thread).
   Filo must never be able to take an app down.
 - **Cache key** = wrapper VERSION + Instrumenter VERSION + realpath + mtime.
   Any change to the injected code ⇒ bump `Instrumenter::VERSION`.
+- **Hooks are spliced, never re-printed**: HookVisitor plans text insertions
+  right after each body's `{` and right before its `}`, with no newlines, so
+  every line keeps its number (`tests/Integration/LineNumbersTest.php`).
+  Instrumenter re-parses the result and fails open if it doesn't parse.
 - **Traces always live in `<project>/.filo/traces`** (breaks in `…/breaks`),
   via `Tracer::outputDir()` — the only place that knows the path. Not
   configurable by design; `.filo/` must be gitignored.
@@ -109,15 +111,14 @@ namespace `Filo\`, PHP ^8.1. "filo" = Italian for thread (Ariadne's thread).
 
 Opcache is switched off per traced request automatically, except where an
 FPM pool pins `opcache.enable` via `php_admin_value`; preloaded files
-(`opcache.preload`) are never traced. Line numbers
-drift inside instrumented files (pretty printer) — trace line numbers are
-correct (baked from original AST); format-preserving printer is the v3 fix.
+(`opcache.preload`) are never traced. Columns (never lines) shift on the
+two brace lines of each hooked function.
 Arrow functions, native functions, eval'd code = caller self-time.
 
 ## Roadmap candidates (phase 3+)
 
 1. ~~opcache coexistence~~ — done: opcache is disabled per traced request.
-2. Format-preserving printer for exact line numbers.
+2. ~~Exact line numbers~~ — done: hooks are spliced into the original source.
 3. Long-running runtime adapters (Octane/RoadRunner: `Collector::cycle()`).
 4. Sampling mode (instrument N% of requests) for staging.
 5. Designed web UI from Claude Design: drop exported files into server/ui/
