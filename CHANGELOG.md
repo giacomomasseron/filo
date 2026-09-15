@@ -7,6 +7,11 @@ the README's "Public API" section says what that covers.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-09-15
+
+The first stable release. From here on, the public API in the README's
+"Public API" section follows semantic versioning.
+
 ### Upgrading from 0.2
 
 - **Closure names changed on PHP 8.1–8.3.** They used to be `{closure}`
@@ -37,8 +42,9 @@ the README's "Public API" section says what that covers.
   `FILO_KEEP`; 0 keeps them all). Per-test artifacts are never pruned.
 - `filo on`, `filo off`, `filo clear`, `filo doctor` and `filo --version`.
 - `examples/bench.php`, which measures what tracing costs, and an "Overhead"
-  section in the README with its numbers. CI publishes those numbers, with the times of a
-  traced and an untraced Laravel request, on every run's summary page.
+  section in the README with its numbers. CI publishes those numbers, with
+  the times of a traced and an untraced Laravel request, on every run's
+  summary page.
 - A "Public API" section in the README, and `SECURITY.md`.
 
 ### Changed
@@ -114,6 +120,7 @@ First release.
   `FiloAssertions` trait, and per-test trace artifacts through
   `TraceExtension` and `#[Traced]`.
 
-[Unreleased]: https://github.com/giacomomasseron/filo/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/giacomomasseron/filo/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/giacomomasseron/filo/compare/v0.2.0...v1.0.0
 [0.2.0]: https://github.com/giacomomasseron/filo/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/giacomomasseron/filo/releases/tag/v0.1.0

@@ -2,8 +2,7 @@
 
 ## Supported versions
 
-Security fixes go into the latest release: the latest 0.x until 1.0 is
-out, then the latest 1.x.
+Security fixes go into the latest 1.x release.
 
 ## Reporting a vulnerability
 
