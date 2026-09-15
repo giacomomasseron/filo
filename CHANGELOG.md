@@ -7,6 +7,12 @@ the README's "Public API" section says what that covers.
 
 ## [Unreleased]
 
+### Added
+
+- `filo export` writes a trace for other tools: cachegrind, which PhpStorm,
+  KCachegrind and QCachegrind open, or speedscope, e.g.
+  `filo export --format=speedscope`.
+
 ## [1.1.0] - 2026-09-15
 
 ### Added

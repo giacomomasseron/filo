@@ -34,7 +34,15 @@ namespace `Filo\`, PHP ^8.1. "filo" = Italian for thread (Ariadne's thread).
   wrapper → op → re-hook). A missed one = infinite recursion.
 - **Eager loading**: every `Filo\` class is `require_once`'d in
   `bootstrap.php` BEFORE the wrapper registers. New src file ⇒ new require
-  there, or autoloading it recurses through the wrapper.
+  there, or autoloading it recurses through the wrapper. Exceptions, which
+  a traced request never needs: the PHPUnit-dependent Testing classes and
+  `src/Export/`.
+- **Exporters** (`src/Export/`): one class per format implementing
+  `Filo\Export\Exporter`, listed in `Exporters::builtIn()`. They read a
+  `TraceFile` (a validated v1 trace) through `CallTree` and stream to a
+  resource, never building the output in memory. bin/filo requires them in
+  its `export` case. New format ⇒ a class, `builtIn()`, README "Exporting
+  traces", tests.
 - **`$openedPath` stays unset** for instrumented includes so `__FILE__`/
   `__DIR__` keep pointing at the real source, never the cache.
 - **Fail open**: any parse/instrumentation failure ⇒ serve the ORIGINAL file.

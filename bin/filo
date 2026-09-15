@@ -11,6 +11,8 @@ declare(strict_types=1);
  *   filo doctor                      check the setup: root, settings, git, opcache
  *   filo serve [port]                start the local web viewer (default 8090)
  *   filo clear                       delete traces and test artifacts
+ *   filo export [<trace>] [--format=cachegrind|speedscope] [-o <file>|-]
+ *                                    write a trace for PhpStorm (cachegrind) or speedscope
  *   filo breaks                      list configured breakpoints
  *   filo break "App\Foo::bar"        add a breakpoint (or path/to/File.php:42)
  *   filo unbreak "App\Foo::bar"      remove a breakpoint (or path/to/File.php:42)
@@ -28,6 +30,10 @@ require_once dirname(__DIR__) . '/src/Breakpoints.php';
 require_once dirname(__DIR__) . '/src/Settings.php';
 
 use Filo\Breakpoints;
+use Filo\Export\Exporters;
+use Filo\Export\ExportException;
+use Filo\Export\TraceFile;
+use Filo\Export\TraceLocator;
 use Filo\Settings;
 use Filo\Tracer;
 
@@ -258,6 +264,55 @@ switch ($cmd) {
         echo 'breakpoint removed: ', Breakpoints::label($entry), "\n";
         break;
 
+    case 'export':
+        // Only this command needs them: loaded here, not for every command.
+        foreach (['Exporter', 'ExportException', 'TraceFile', 'CallTree', 'CachegrindExporter', 'SpeedscopeExporter', 'Exporters', 'TraceLocator'] as $class) {
+            require_once dirname(__DIR__) . "/src/Export/{$class}.php";
+        }
+        ini_set('memory_limit', '-1'); // a trace decodes to several times its size on disk
+
+        $what   = 'latest';
+        $format = 'cachegrind';
+        $target = null;
+        for ($i = 2, $n = count($argv); $i < $n; $i++) {
+            if (preg_match('/^--(format|output)=(.*)$/', $argv[$i], $m) === 1) {
+                if ($m[1] === 'format') {
+                    $format = $m[2];
+                } else {
+                    $target = $m[2];
+                }
+            } elseif (in_array($argv[$i], ['--format', '-f'], true) && isset($argv[$i + 1])) {
+                $format = $argv[++$i];
+            } elseif (in_array($argv[$i], ['--output', '-o'], true) && isset($argv[$i + 1])) {
+                $target = $argv[++$i];
+            } else {
+                $what = $argv[$i];
+            }
+        }
+
+        try {
+            $exporter = Exporters::builtIn()->get($format);
+            $locator  = new TraceLocator($outputDir);
+            $path     = $locator->locate($what);
+            $trace    = TraceFile::fromFile($path, $locator->nameOf($path));
+            if ($target === '-') {
+                $exporter->write($trace, STDOUT);
+                break;
+            }
+            $target ??= $root . '/.filo/exports/' . $exporter->fileName($trace);
+            is_dir(dirname($target)) || mkdir(dirname($target), 0777, true);
+            $out = @fopen($target, 'wb');
+            if ($out === false) {
+                throw ExportException::unwritable($target);
+            }
+            $exporter->write($trace, $out);
+            fclose($out);
+            printf("wrote %s: %s calls of %s\nopen it with %s\n", $target, number_format(count($trace->events)), $trace->label(), $exporter->openWith());
+        } catch (ExportException $e) {
+            $die($e->getMessage() . "\n");
+        }
+        break;
+
     case 'pending':
         $snaps = $pending();
         if ($snaps === []) {
@@ -311,6 +366,7 @@ switch ($cmd) {
         echo "  filo doctor                      check the setup: root, settings, git, opcache\n";
         echo "  filo serve [port]                start the local web viewer (default 8090)\n";
         echo "  filo clear                       delete traces and test artifacts\n";
+        echo "  filo export [<trace>] [--format=cachegrind|speedscope] [-o <file>|-]\n";
         echo "  filo breaks | break <fn>|<file:line> | unbreak <fn>|<file:line>\n";
         echo "  filo pending | show <id> | continue <id> | continue --all\n";
         echo "  filo --version\n";

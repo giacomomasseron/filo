@@ -106,11 +106,39 @@ need rather than all of `vendor/`.
 vendor/bin/filo on | off       # turn tracing on/off for this project (.filo-on)
 vendor/bin/filo doctor         # check the setup: project root, settings, git, opcache
 vendor/bin/filo serve [port]   # the local web viewer, see below
+vendor/bin/filo export         # the latest trace, for PhpStorm or speedscope, see below
 vendor/bin/filo clear          # delete traces and test artifacts
 vendor/bin/filo --version
 ```
 
 The breakpoint commands are under [Breakpoints](#breakpoints).
+
+## Exporting traces
+
+`filo export` writes a trace in a format other tools open:
+
+```bash
+vendor/bin/filo export                                        # the latest request trace, as cachegrind
+vendor/bin/filo export --format=speedscope                    # the same, for speedscope
+vendor/bin/filo export tests/App_CheckoutTest__testPay.json   # a test's trace
+vendor/bin/filo export 20260915-101530-123456-ab12.json -o checkout.out
+```
+
+The file goes to `.filo/exports/` unless `-o` names one (`-o -` writes it
+to stdout).
+
+- **cachegrind** is what Xdebug's profiler writes: open it in PhpStorm
+  (*Tools → Analyze Xdebug Profiler Snapshot*), KCachegrind or QCachegrind.
+  It sums the trace up per function: self time, total time, call counts,
+  and who called whom.
+- **speedscope**: drop the file on <https://www.speedscope.app>, where it
+  stays in your browser. You get the whole timeline as a flame chart, plus
+  left-heavy and sandwich views.
+
+Times include filo's own cost per traced call (see [Overhead](#overhead)),
+and time spent in untraced code (`vendor/`, PHP's own functions, `fn`
+closures) counts as the caller's self time. A trace cut short (`capped`)
+exports what it recorded.
 
 ## Tests & CI
 
