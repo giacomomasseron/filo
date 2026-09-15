@@ -6,13 +6,19 @@ use Filo\Tests\Support\TempProject;
 
 /**
  * Runs $call in a traced child process with $breakpoint (a function name,
- * or an entry in the web UI's object form) and, if the child pauses, reads
- * the snapshot and releases it.
+ * or an entry in the web UI's object form). If the child pauses, reads the
+ * snapshot and hands it to $release, which by default does what
+ * `filo continue <id>` does.
  *
- * @return array{?string, string} [raw snapshot JSON (null if it never paused), child output]
+ * @param array<string, string> $env extra environment for the child
+ * @param null|Closure(array, string): void $release gets the snapshot and the project root
+ * @return array{?string, string, string, float} [raw snapshot JSON (null if it never paused), child output, project root, wall ms]
  */
-function pauseAndSnapshot(string|array $breakpoint, string $functions, string $call): array
+function pauseAndSnapshot(string|array $breakpoint, string $functions, string $call, array $env = [], ?Closure $release = null): array
 {
+    $release ??= static function (array $snapshot, string $root): void {
+        touch($root . '/.filo/traces/breaks/' . $snapshot['id'] . '.continue');
+    };
     $root = TempProject::root();
     mkdir($root . '/.filo');
     file_put_contents($root . '/.filo/breakpoints.json', json_encode(['breakpoints' => [$breakpoint]]));
@@ -29,8 +35,9 @@ function pauseAndSnapshot(string|array $breakpoint, string $functions, string $c
         'FILO_PROJECT_ROOT'  => $root,
         'FILO_CACHE_DIR'     => $root . '/cache',
         'FILO_BREAK_TIMEOUT' => '10',
-    ]);
-    $proc = proc_open(
+    ], $env);
+    $start = hrtime(true);
+    $proc  = proc_open(
         [PHP_BINARY, '-d', 'opcache.enable_cli=0', $root . '/main.php'],
         [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
         $pipes,
@@ -46,7 +53,7 @@ function pauseAndSnapshot(string|array $breakpoint, string $functions, string $c
             $raw = (string) file_get_contents($f);
             if (is_array($decoded = json_decode($raw, true))) { // skip a half-written file
                 $snapshot = $raw;
-                touch($breaks . '/' . $decoded['id'] . '.continue');
+                $release($decoded, $root);
             }
         }
         if ($snapshot === null && !proc_get_status($proc)['running']) {
@@ -56,7 +63,7 @@ function pauseAndSnapshot(string|array $breakpoint, string $functions, string $c
     $out = stream_get_contents($pipes[1]) . stream_get_contents($pipes[2]);
     proc_close($proc);
 
-    return [$snapshot, $out];
+    return [$snapshot, $out, $root, (hrtime(true) - $start) / 1e6];
 }
 
 test('a breakpoint snapshot never contains #[SensitiveParameter] values', function (): void {
@@ -110,4 +117,47 @@ test('a breakpoint can target one closure by its name', function (): void {
         ->and(json_decode($snapshot, true)['fn'])->toBe('{closure:filo_bp_outer():2}')
         ->and(json_decode($snapshot, true)['vars']['n'])->toBe(3)
         ->and($out)->toBe('ok');
+});
+
+test('a paused request nobody releases continues after FILO_BREAK_TIMEOUT', function (): void {
+    [$snapshot, $out, $root, $ms] = pauseAndSnapshot(
+        'filo_bp_wait',
+        'function filo_bp_wait(): string { return "ok"; }',
+        'filo_bp_wait()',
+        ['FILO_BREAK_TIMEOUT' => '1'],
+        static function (): void {}, // nobody releases it
+    );
+
+    $traces = glob($root . '/.filo/traces/*.json') ?: [];
+    expect($snapshot)->not->toBeNull('the breakpoint never paused: ' . $out)
+        ->and($out)->toBe('ok')
+        ->and($ms)->toBeGreaterThan(900) // it really waited for the timeout
+        ->and(glob($root . '/.filo/traces/breaks/*.json'))->toBe([]) // snapshot cleaned up
+        ->and($traces)->toHaveCount(1)
+        ->and(json_decode((string) file_get_contents($traces[0]), true)['duration'] / 1e6)
+        ->toBeLessThan(1000); // the 1 s pause is not in the trace
+});
+
+test('filo continue --all releases a paused request', function (): void {
+    [$snapshot, $out, , $ms] = pauseAndSnapshot(
+        'filo_bp_all',
+        'function filo_bp_all(): string { return "ok"; }',
+        'filo_bp_all()',
+        ['FILO_BREAK_TIMEOUT' => '30'],
+        static function (array $snapshot, string $root): void {
+            $p = proc_open(
+                [PHP_BINARY, dirname(__DIR__, 2) . '/bin/filo', 'continue', '--all'],
+                [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+                $pipes,
+                $root,
+                array_merge(getenv(), ['FILO_PROJECT_ROOT' => $root]),
+            );
+            stream_get_contents($pipes[1]);
+            proc_close($p);
+        },
+    );
+
+    expect($snapshot)->not->toBeNull('the breakpoint never paused: ' . $out)
+        ->and($out)->toBe('ok')
+        ->and($ms)->toBeLessThan(10_000); // released, not timed out after 30 s
 });

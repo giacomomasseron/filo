@@ -9,15 +9,20 @@ use Filo\Testing\Trace;
 use Filo\Tests\Support\TempProject;
 
 test('capture returns a Trace with wall time and the closure result', function (): void {
-    $t = Recorder::capture(function (): string {
+    // Time the sleep itself: on Windows a relative sleep can end up to one
+    // clock tick (15.6 ms by default) earlier than asked, as hrtime sees it.
+    $sleptNs = 0;
+    $t = Recorder::capture(function () use (&$sleptNs): string {
+        $start = hrtime(true);
         usleep(5_000);
+        $sleptNs = hrtime(true) - $start;
 
         return 'done';
     });
 
     expect($t)->toBeInstanceOf(Trace::class)
         ->and($t->result())->toBe('done')
-        ->and($t->wallMs())->toBeGreaterThan(4.0);
+        ->and($t->wallMs())->toBeGreaterThanOrEqual($sleptNs / 1e6); // the wall time covers the closure
 });
 
 test('capture slices only the events of the closure', function (): void {
