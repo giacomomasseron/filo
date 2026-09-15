@@ -29,7 +29,7 @@ use ReflectionMethod;
 /**
  * Writes <project>/.filo/traces/tests/<Class>__<method>.json for every
  * failing test and every test carrying #[Traced]. PHPUnit >= 10 event API;
- * Pest 2/3 run on PHPUnit 10/11 so the same class serves both.
+ * Pest 2 to 5 run on PHPUnit 10 to 13, so the same class serves both.
  *
  * Register in phpunit.xml:
  *   <extensions><bootstrap class="Filo\Testing\PHPUnit\TraceExtension"/></extensions>

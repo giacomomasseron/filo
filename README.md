@@ -56,7 +56,8 @@ changed at runtime, so turn opcache off there while tracing.
 ## Tests & CI
 
 filo works inside your test suite once the process is enabled
-(`FILO_ENABLED=1 vendor/bin/pest`, or the `.filo-on` marker).
+(`FILO_ENABLED=1 vendor/bin/pest`, or the `.filo-on` marker), with Pest 2
+to 5 and PHPUnit 10.5 to 13.
 
 ### Performance assertions (no baselines — explicit thresholds only)
 
