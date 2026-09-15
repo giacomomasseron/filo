@@ -54,7 +54,8 @@ vars easy), and how a team shares one configuration: commit it.
 
 ```json
 {
-    "exclude": ["vendor", "storage"],
+    "include": ["vendor/acme/billing"],
+    "exclude": ["/vendor/", "/storage/"],
     "keep": 200,
     "breakTimeout": 120
 }
@@ -62,7 +63,8 @@ vars easy), and how a team shares one configuration: commit it.
 
 | `filo.json`    | Env var              | Default            | Meaning                                                    |
 |----------------|----------------------|--------------------|------------------------------------------------------------|
-| `exclude`      | `FILO_EXCLUDE`       | `["vendor"]`       | Path substrings to skip (env var: comma-separated)         |
+| `include`      | `FILO_INCLUDE`       | `[]`               | Paths to trace even though `exclude` matches them, see below |
+| `exclude`      | `FILO_EXCLUDE`       | `["/vendor/"]`     | Path substrings to skip (env var: comma-separated)         |
 | `keep`         | `FILO_KEEP`          | `200`              | Request traces to keep, older ones are deleted (0 = all)   |
 | `breakTimeout` | `FILO_BREAK_TIMEOUT` | `120`              | Seconds before a paused request continues on its own       |
 |                | `FILO_ENABLED`       | `0`                | Master switch (the `.filo-on` file is the alternative)     |
@@ -72,6 +74,31 @@ vars easy), and how a team shares one configuration: commit it.
 A value filo can't use (a typo, a wrong type) is ignored, never fatal.
 `vendor/bin/filo doctor` shows every setting, where it comes from, and
 any problem.
+
+### Tracing vendor code
+
+`vendor/` isn't traced by default, so its calls cost nothing and don't
+show up. To see inside a package, include its folder (relative to the
+project root, or absolute), or a single file:
+
+```json
+{ "include": ["vendor/laravel/framework/src/Illuminate/Database"] }
+```
+
+Included code is traced like your own: its calls show up in traces,
+breakpoints on its functions pause, and tests can count them, e.g. to
+catch N+1 queries at the source:
+
+```php
+expect(fn () => $orders->forUser($user))
+    ->toCall('Illuminate\Database\Connection::select')->atMost(1);
+```
+
+`include` wins over `exclude`; filo itself, its cache and its parser are
+never traced. Each included call costs what your own do (see
+[Overhead](#overhead)), and the first traced request after a change
+instruments every included file it loads, so include the folders you
+need rather than all of `vendor/`.
 
 ## Command line
 
@@ -274,6 +301,8 @@ Rules of engagement:
 - Entry breakpoints only: you see the arguments (and `$this` for
   instance methods) as the function begins. No stepping, no eval —
   that's Xdebug territory, deliberately.
+- Breakpoints fire only in traced code: to pause inside a package in
+  `vendor/`, add it to `include` (see [Tracing vendor code](#tracing-vendor-code)).
 - Each breakpoint pauses **once per request** (so a breakpoint inside
   a loop doesn't pause 500 times).
 - A paused request auto-continues after `FILO_BREAK_TIMEOUT` seconds

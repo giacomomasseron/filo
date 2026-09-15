@@ -316,17 +316,8 @@ final class IncludeStreamWrapper
 
     private static function eligible(string $path): bool
     {
-        if (!str_ends_with($path, '.php')) {
-            return false;
-        }
-
-        foreach (Tracer::$exclude as $needle) {
-            if ($needle !== '' && str_contains($path, $needle)) {
-                return false;
-            }
-        }
-
-        return true;
+        return str_ends_with($path, '.php')
+            && Tracer::traces($path, Tracer::$include, Tracer::$exclude, Tracer::$never);
     }
 
     /**

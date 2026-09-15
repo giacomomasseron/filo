@@ -10,13 +10,13 @@ namespace Filo;
  * filo.json is how people who turn filo on with .filo-on (Herd, Valet: no
  * easy env vars) configure it, and how a team shares one configuration:
  *
- *     {"exclude": ["vendor", "storage"], "keep": 200, "breakTimeout": 120}
+ *     {"include": ["vendor/acme/billing"], "exclude": ["/vendor/", "/storage/"], "keep": 200, "breakTimeout": 120}
  *
  * Read by Tracer at startup and by `filo doctor`, which prints each value's
  * source. Fails open: a broken or mistyped filo.json is ignored value by
  * value, and the problem is reported instead.
  *
- * Dependency-free: bin/filo loads it without Composer.
+ * Needs only Tracer: bin/filo loads both without Composer.
  *
  * @internal The filo.json format is public (README "Configuration"); this class is not.
  */
@@ -26,25 +26,28 @@ final class Settings
 
     /** Setting => the env var that overrides it. */
     private const ENV = [
+        'include'      => 'FILO_INCLUDE',
         'exclude'      => 'FILO_EXCLUDE',
         'keep'         => 'FILO_KEEP',
         'breakTimeout' => 'FILO_BREAK_TIMEOUT',
     ];
 
     private const DEFAULTS = [
-        'exclude'      => ['vendor'],
+        'include'      => [],
+        'exclude'      => ['/vendor/'],
         'keep'         => 200,
         'breakTimeout' => 120,
     ];
 
     private const EXPECTED = [
+        'include'      => 'a list of paths',
         'exclude'      => 'a list of path substrings',
         'keep'         => 'a whole number >= 0',
         'breakTimeout' => 'a whole number of seconds >= 1',
     ];
 
     /**
-     * @return array{exclude: list<string>, keep: int, breakTimeout: int, sources: array<string, string>, problems: list<string>}
+     * @return array{include: list<string>, exclude: list<string>, keep: int, breakTimeout: int, sources: array<string, string>, problems: list<string>}
      */
     public static function load(string $projectRoot): array
     {
@@ -78,6 +81,13 @@ final class Settings
             $problems[] = sprintf('%s: unknown setting "%s"', self::FILE, $unknown);
         }
 
+        /** @var list<string> $include */
+        $include = $values['include'];
+        foreach ($include as $entry) {
+            if (!file_exists(Tracer::resolve($entry, $projectRoot))) {
+                $problems[] = sprintf('%s: include "%s" matches no file or folder', $sources['include'], $entry);
+            }
+        }
         /** @var list<string> $exclude */
         $exclude = $values['exclude'];
         /** @var int $keep */
@@ -86,6 +96,7 @@ final class Settings
         $breakTimeout = $values['breakTimeout'];
 
         return [
+            'include'      => $include,
             'exclude'      => $exclude,
             'keep'         => $keep,
             'breakTimeout' => $breakTimeout,
@@ -116,7 +127,7 @@ final class Settings
     /** The setting's value, or null when $raw isn't valid for it. $fromEnv: $raw is an env var string. */
     private static function parse(string $key, mixed $raw, bool $fromEnv): mixed
     {
-        if ($key === 'exclude') {
+        if ($key === 'include' || $key === 'exclude') {
             $list = $fromEnv && is_string($raw) ? explode(',', $raw) : $raw;
             if (!is_array($list) || !array_is_list($list)) {
                 return null;

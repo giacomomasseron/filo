@@ -14,7 +14,8 @@ namespace Filo;
  *   (traces are ALWAYS written to <project>/.filo/traces — not configurable)
  *   FILO_PROJECT_ROOT=/app             override project-root discovery (see findProjectRoot)
  * and the settings filo.json can hold too (see Settings: env > filo.json > default):
- *   FILO_EXCLUDE=vendor,storage        comma-separated path substrings to skip
+ *   FILO_INCLUDE=vendor/acme/billing   comma-separated paths to trace even though excluded
+ *   FILO_EXCLUDE=/vendor/,/storage/    comma-separated path substrings to skip
  *   FILO_KEEP=200                      request traces to keep (0 = all)
  *   FILO_BREAK_TIMEOUT=120             seconds before a paused breakpoint auto-continues
  *
@@ -39,10 +40,26 @@ final class Tracer
     public static string $projectRoot;
 
     /**
+     * What gets instrumented, as traces() takes it: paths to trace (a
+     * folder ends with /), path substrings to skip, and substrings no
+     * setting overrides. Spelled like Breakpoints::pathKey().
+     *
      * @internal
-     * @var string[] path substrings that must NOT be instrumented
+     * @var list<string>
+     */
+    public static array $include = [];
+
+    /**
+     * @internal
+     * @var list<string>
      */
     public static array $exclude = [];
+
+    /**
+     * @internal
+     * @var list<string>
+     */
+    public static array $never = [];
 
     /**
      * The per-request boundary for long-running runtimes (Octane,
@@ -57,6 +74,75 @@ final class Tracer
             Collector::cycle(self::$outputDir);
             self::prune();
         }
+    }
+
+    /**
+     * Whether the file at $path gets instrumented: never when a $never
+     * substring matches (filo itself), yes when an $include path does, no
+     * when an $exclude substring does, yes otherwise. The lists are spelled
+     * like Breakpoints::pathKey(), see pathRules().
+     *
+     * @internal
+     * @param list<string> $include
+     * @param list<string> $exclude
+     * @param list<string> $never
+     */
+    public static function traces(string $path, array $include, array $exclude, array $never): bool
+    {
+        $key = Breakpoints::pathKey($path);
+        foreach ($never as $needle) {
+            if (str_contains($key, $needle)) {
+                return false;
+            }
+        }
+        foreach ($include as $entry) {
+            if ($key === $entry || (str_ends_with($entry, '/') && str_starts_with($key, $entry))) {
+                return true;
+            }
+        }
+        foreach ($exclude as $needle) {
+            if (str_contains($key, $needle)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * The include and exclude settings the way traces() compares them:
+     * include entries resolved against the project root (or absolute) and
+     * made real, a folder with a trailing /, and dropped when they match
+     * nothing (Settings reports those); exclude substrings pathKey()'d.
+     *
+     * @internal
+     * @param list<string> $include
+     * @param list<string> $exclude
+     * @return array{list<string>, list<string>}
+     */
+    public static function pathRules(array $include, array $exclude, string $projectRoot): array
+    {
+        $paths = [];
+        foreach ($include as $entry) {
+            $real = realpath(self::resolve($entry, $projectRoot));
+            if ($real !== false) {
+                $paths[] = Breakpoints::pathKey($real) . (is_dir($real) ? '/' : '');
+            }
+        }
+        $needles = [];
+        foreach ($exclude as $needle) {
+            if ($needle !== '') {
+                $needles[] = Breakpoints::pathKey($needle);
+            }
+        }
+
+        return [$paths, $needles];
+    }
+
+    /** @internal $path as it names a file: absolute as is, else relative to the project root. */
+    public static function resolve(string $path, string $projectRoot): string
+    {
+        return preg_match('~^([A-Za-z]:)?[/\\\\]~', $path) === 1 ? $path : rtrim($projectRoot, '/\\') . '/' . $path;
     }
 
     /** @internal Called once, by bootstrap.php. */
@@ -82,19 +168,21 @@ final class Tracer
         $settings   = Settings::load(self::$projectRoot);
         self::$keep = $settings['keep'];
 
-        // Never instrument ourselves or our own caches, regardless of config.
-        self::$exclude = [
-            ...$settings['exclude'],
-            dirname(__DIR__),   // this package
-            self::$cacheDir,
-        ];
-
         if (!is_dir(self::$cacheDir)) {
             @mkdir(self::$cacheDir, 0777, true);
         }
         if (!is_dir(self::$outputDir)) {
             @mkdir(self::$outputDir, 0777, true);
         }
+
+        [self::$include, self::$exclude] = self::pathRules($settings['include'], $settings['exclude'], self::$projectRoot);
+        // Never instrument ourselves, our caches or the parser we instrument
+        // with, whatever the settings say.
+        self::$never = [
+            Breakpoints::pathKey(dirname(__DIR__)) . '/', // this package
+            Breakpoints::pathKey(realpath(self::$cacheDir) ?: self::$cacheDir) . '/',
+            '/nikic/php-parser/',
+        ];
 
         Collector::begin();
         Debugger::init(self::$projectRoot, self::$breaksDir, $settings['breakTimeout']);

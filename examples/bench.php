@@ -37,7 +37,7 @@ $env   = static fn (bool $on, string $cache): array => [
     'FILO_ENABLED'      => $on ? '1' : '0',
     'FILO_PROJECT_ROOT' => $root,
     'FILO_CACHE_DIR'    => $root . '/cache/' . $cache,
-    'FILO_EXCLUDE'      => 'vendor',
+    'FILO_EXCLUDE'      => '/vendor/',
 ];
 
 $callsOff = run('calls', $root, $env(false, 'calls'));

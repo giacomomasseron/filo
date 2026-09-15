@@ -85,7 +85,8 @@ test('filo doctor shows each setting and where it comes from', function (): void
     [$code, $out] = filoRun($root, ['doctor'], ['FILO_BREAK_TIMEOUT' => '7']);
 
     expect($code)->toBe(0, $out)
-        ->and($out)->toMatch('/exclude\s+vendor\s+default/')
+        ->and($out)->toMatch('/include\s+\(nothing\)\s+default/')
+        ->and($out)->toMatch('~exclude\s+/vendor/\s+default~')
         ->and($out)->toMatch('/keep\s+50\s+filo\.json/')
         ->and($out)->toMatch('/breakTimeout\s+7 s\s+FILO_BREAK_TIMEOUT/');
 });

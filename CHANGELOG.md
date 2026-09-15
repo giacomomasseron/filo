@@ -11,12 +11,22 @@ the README's "Public API" section says what that covers.
 
 - `filo break` and `filo unbreak` take a file and line too, e.g.
   `filo break app/Services/OrderService.php:42`.
+- An `include` setting (`FILO_INCLUDE`) traces chosen paths that `exclude`
+  would skip, e.g. `"include": ["vendor/acme/billing"]`: their calls show
+  up in traces, breakpoints in them pause, and tests can count them.
+
+### Changed
+
+- `exclude` compares paths with `/` separators, and ignores case on Windows.
 
 ### Fixed
 
 - Breakpoints on a file and line, which the web viewer lets you add, now
   pause the request: at the entry of the innermost function or closure
   containing that line. They used to never fire.
+- The default `exclude` is now `["/vendor/"]`. The old `"vendor"` matched
+  any path containing the word, so a project in a folder such as
+  `vendor-portal/` wasn't traced at all.
 
 ## [1.0.0] - 2026-09-15
 

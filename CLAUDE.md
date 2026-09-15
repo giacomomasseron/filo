@@ -65,9 +65,10 @@ namespace `Filo\`, PHP ^8.1. "filo" = Italian for thread (Ariadne's thread).
 - **Traces always live in `<project>/.filo/traces`** (breaks in `…/breaks`),
   via `Tracer::outputDir()` — the only place that knows the path. Not
   configurable by design; `.filo/` must be gitignored.
-- **Self-exclusion**: the package dir and cache dir are always excluded from
-  instrumentation (see `Tracer::start`). Test fixtures must live OUTSIDE the
-  repo (temp dir) — see `examples/smoke.php`.
+- **Self-exclusion**: the package dir, the cache dir and nikic/php-parser are
+  never instrumented, whatever `include` says (`Tracer::$never`, checked
+  first by `Tracer::traces()`). Test fixtures must live OUTSIDE the repo
+  (temp dir) — see `examples/smoke.php`.
 - **Opcache is off for traced requests**: `Tracer::start()` calls
   `ini_set('opcache.enable', '0')` (allowed at runtime, off-only, until the
   request ends). Without it a warm cache bypasses the wrapper, and
@@ -80,11 +81,14 @@ namespace `Filo\`, PHP ^8.1. "filo" = Italian for thread (Ariadne's thread).
   `($id & 1023) === 0` — reading the static caps on every call cost ~7%.
 - **breakpoints.json has one reader/writer**: `Filo\Breakpoints`, shared by
   bin/filo, server/index.php and Debugger. Parse it nowhere else.
-- **Settings have one reader**: `Filo\Settings` resolves `exclude`, `keep`
-  and `breakTimeout` as env var > `<root>/filo.json` > default. A bad value
-  is ignored on its own (fail open) and reported by `filo doctor`. New
-  setting ⇒ add it there, to the README table and to doctor's output.
-  `FILO_ENABLED`, `FILO_CACHE_DIR`, `FILO_PROJECT_ROOT` stay env-only.
+- **Settings have one reader**: `Filo\Settings` resolves `include`,
+  `exclude`, `keep` and `breakTimeout` as env var > `<root>/filo.json` >
+  default. A bad value is ignored on its own (fail open) and reported by
+  `filo doctor`. New setting ⇒ add it there, to the README table and to
+  doctor's output. `FILO_ENABLED`, `FILO_CACHE_DIR`, `FILO_PROJECT_ROOT`
+  stay env-only. What gets instrumented is `Tracer::traces()`'s call:
+  `$never`, then `include` (paths), then `exclude` (substrings), all
+  compared the way `Breakpoints::pathKey()` spells paths.
 - **Retention**: `Tracer::prune()` keeps the newest `keep` request traces
   after every flush (shutdown and `Tracer::cycle()`); `tests/` artifacts are
   never pruned. Trace names carry microseconds, so name order = write order.

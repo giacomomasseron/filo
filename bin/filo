@@ -151,6 +151,7 @@ switch ($cmd) {
         array_push($problems, ...$settings['problems']);
         $row('settings', is_file($root . '/' . Settings::FILE) ? Settings::FILE : 'no ' . Settings::FILE . ': env vars and defaults');
         $values = [
+            'include'      => $settings['include'] === [] ? '(nothing)' : implode(', ', $settings['include']),
             'exclude'      => $settings['exclude'] === [] ? '(nothing)' : implode(', ', $settings['exclude']),
             'keep'         => $settings['keep'] === 0 ? '0 (all)' : (string) $settings['keep'],
             'breakTimeout' => $settings['breakTimeout'] . ' s',
