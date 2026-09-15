@@ -7,6 +7,8 @@ the README's "Public API" section says what that covers.
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-09-15
+
 ### Added
 
 - `filo export` writes a trace for other tools: cachegrind, which PhpStorm,
@@ -149,7 +151,8 @@ First release.
   `FiloAssertions` trait, and per-test trace artifacts through
   `TraceExtension` and `#[Traced]`.
 
-[Unreleased]: https://github.com/giacomomasseron/filo/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/giacomomasseron/filo/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/giacomomasseron/filo/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/giacomomasseron/filo/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/giacomomasseron/filo/compare/v0.2.0...v1.0.0
 [0.2.0]: https://github.com/giacomomasseron/filo/compare/v0.1.0...v0.2.0
