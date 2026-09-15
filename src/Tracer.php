@@ -143,26 +143,37 @@ final class Tracer
      */
     public static function findProjectRoot(): string
     {
+        return self::locateProjectRoot()[0];
+    }
+
+    /**
+     * findProjectRoot(), plus how the root was found (for `filo doctor`).
+     *
+     * @internal
+     * @return array{string, string} [root, how it was found]
+     */
+    public static function locateProjectRoot(): array
+    {
         $env = self::env('FILO_PROJECT_ROOT', '');
         if ($env !== '') {
-            return rtrim($env, '/');
+            return [rtrim($env, '/'), 'FILO_PROJECT_ROOT'];
         }
 
         $installed = dirname(__DIR__, 4);
         if (self::looksLikeProject($installed)) {
-            return $installed;
+            return [$installed, "filo's place in vendor/"];
         }
 
         $script = (string) ($_SERVER['SCRIPT_FILENAME'] ?? '');
         $starts = array_filter([
-            $script !== '' ? dirname($script) : '',
-            (string) getcwd(),
+            'the running script'    => $script !== '' ? dirname($script) : '',
+            'the working directory' => (string) getcwd(),
         ]);
 
-        foreach ($starts as $dir) {
+        foreach ($starts as $from => $dir) {
             while ($dir !== '.') {
                 if (self::looksLikeProject($dir)) {
-                    return $dir;
+                    return [$dir, "walking up from $from"];
                 }
                 $parent = dirname($dir);
                 if ($parent === $dir) {
@@ -172,7 +183,7 @@ final class Tracer
             }
         }
 
-        return (string) getcwd();
+        return [(string) getcwd(), 'nothing: no composer.json or .filo/ above the working directory'];
     }
 
     /**

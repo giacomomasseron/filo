@@ -76,8 +76,8 @@ namespace `Filo\`, PHP ^8.1. "filo" = Italian for thread (Ariadne's thread).
   bin/filo, server/index.php and Debugger. Parse it nowhere else.
 - **Settings have one reader**: `Filo\Settings` resolves `exclude`, `keep`
   and `breakTimeout` as env var > `<root>/filo.json` > default. A bad value
-  is ignored on its own (fail open) and kept in `problems`. New setting ⇒
-  add it there and to the README table.
+  is ignored on its own (fail open) and reported by `filo doctor`. New
+  setting ⇒ add it there, to the README table and to doctor's output.
   `FILO_ENABLED`, `FILO_CACHE_DIR`, `FILO_PROJECT_ROOT` stay env-only.
 - **Retention**: `Tracer::prune()` keeps the newest `keep` request traces
   after every flush (shutdown and `Tracer::cycle()`); `tests/` artifacts are

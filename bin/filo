@@ -4,16 +4,20 @@
 declare(strict_types=1);
 
 /*
- * filo — breakpoint control CLI. Self-contained: no autoload needed.
+ * filo's command line. Self-contained: no autoload needed, so running it
+ * never traces itself.
  *
+ *   filo on | off                    turn tracing on/off for this project (.filo-on)
+ *   filo doctor                      check the setup: root, settings, git, opcache
+ *   filo serve [port]                start the local web viewer (default 8090)
+ *   filo clear                       delete traces and test artifacts
  *   filo breaks                      list configured breakpoints
  *   filo break "App\Foo::bar"        add a breakpoint
  *   filo unbreak "App\Foo::bar"      remove a breakpoint
  *   filo pending                     list requests currently paused
  *   filo show <id>                   dump a paused request's variables
- *   filo continue <id>               release one paused request
- *   filo serve [port]                start the local web viewer (default 8090)
- *   filo continue --all              release every paused request
+ *   filo continue <id> | --all       release one / every paused request
+ *   filo --version
  *
  * Project root is resolved by Tracer::findProjectRoot() (FILO_PROJECT_ROOT
  * overrides). Traces are always read from <project>/.filo/traces.
@@ -21,13 +25,17 @@ declare(strict_types=1);
 
 require_once dirname(__DIR__) . '/src/Tracer.php';
 require_once dirname(__DIR__) . '/src/Breakpoints.php';
+require_once dirname(__DIR__) . '/src/Settings.php';
 
 use Filo\Breakpoints;
+use Filo\Settings;
+use Filo\Tracer;
 
-$root      = \Filo\Tracer::findProjectRoot();
+[$root, $rootFoundBy] = Tracer::locateProjectRoot();
 $bpFile    = Breakpoints::file($root);
-$outputDir = \Filo\Tracer::outputDir($root);
+$outputDir = Tracer::outputDir($root);
 $breaksDir = rtrim($outputDir, '/') . '/breaks';
+$marker    = $root . '/.filo-on';
 
 $cmd = $argv[1] ?? 'help';
 $arg = $argv[2] ?? null;
@@ -37,11 +45,55 @@ $die = static function (string $msg): never {
     exit(1);
 };
 
+/** FILO_ENABLED as bootstrap.php reads it. */
+$envEnabled = static function (): bool {
+    $value = $_SERVER['FILO_ENABLED'] ?? getenv('FILO_ENABLED');
+
+    return is_string($value) && filter_var($value, FILTER_VALIDATE_BOOL);
+};
+
+/** The installed filo version, from Composer's metadata. */
+$version = static function (): string {
+    $autoload = $GLOBALS['_composer_autoload_path'] ?? null; // set by Composer's vendor/bin proxy
+    $candidates = [
+        is_string($autoload) ? dirname($autoload) . '/composer/InstalledVersions.php' : '',
+        dirname(__DIR__) . '/vendor/composer/InstalledVersions.php', // a checkout of filo itself
+        dirname(__DIR__, 3) . '/composer/InstalledVersions.php',     // vendor/giacomomasseron/filo/bin
+    ];
+    foreach ($candidates as $file) {
+        if ($file === '' || !is_file($file)) {
+            continue;
+        }
+        require_once $file;
+        try {
+            return \Composer\InstalledVersions::getPrettyVersion('giacomomasseron/filo') ?? 'unknown';
+        } catch (\OutOfBoundsException) {
+            return 'unknown';
+        }
+    }
+
+    return 'unknown';
+};
+
+/** Whether $dir, or the nearest folder above it that exists, is writable. */
+$writable = static function (string $dir): bool {
+    while (!is_dir($dir)) {
+        $parent = dirname($dir);
+        if ($parent === $dir) {
+            return false;
+        }
+        $dir = $parent;
+    }
+
+    return is_writable($dir);
+};
+
+/** @return array<string, array<string, mixed>> */
 $pending = static function () use ($breaksDir): array {
     $out = [];
     foreach (glob($breaksDir . '/*.json') ?: [] as $f) {
         $snap = json_decode((string) file_get_contents($f), true);
-        if (is_array($snap) && isset($snap['id'])) {
+        if (is_array($snap) && isset($snap['id']) && is_string($snap['id'])) {
             $out[$snap['id']] = $snap;
         }
     }
@@ -51,8 +103,114 @@ $pending = static function () use ($breaksDir): array {
 };
 
 switch ($cmd) {
-    // Every command keeps entries it doesn't touch as they are: the web UI
-    // writes disabled and file:line breakpoints to the same file.
+    case 'on':
+        touch($marker) || $die("could not create {$marker}\n");
+        echo "tracing on: every request now writes a trace to {$outputDir}\n";
+        echo "(delete {$marker}, or run `filo off`, to stop)\n";
+        break;
+
+    case 'off':
+        echo is_file($marker) && unlink($marker)
+            ? "tracing off: removed {$marker}\n"
+            : "tracing was already off (no {$marker})\n";
+        if ($envEnabled()) {
+            echo "note: FILO_ENABLED is set in this environment, so filo keeps tracing here\n";
+        }
+        break;
+
+    case 'clear':
+        $removed = 0;
+        foreach ([...(glob($outputDir . '/*.json') ?: []), ...(glob($outputDir . '/tests/*.json') ?: [])] as $file) {
+            $removed += (int) @unlink($file);
+        }
+        echo "removed {$removed} trace" . ($removed === 1 ? '' : 's') . " from {$outputDir}\n";
+        break;
+
+    case '--version':
+    case 'version':
+        echo 'filo ', $version(), "\n";
+        break;
+
+    case 'doctor':
+        $problems = [];
+        $row      = static function (string $label, string $value): void {
+            printf("%-14s %s\n", $label, $value);
+        };
+
+        printf("filo %s, PHP %s (%s)\n\n", $version(), PHP_VERSION, PHP_SAPI);
+
+        $row('project root', realpath($root) ?: $root);
+        $row('', "found via {$rootFoundBy}");
+        if (str_starts_with($rootFoundBy, 'nothing')) {
+            $problems[] = 'no project found: run filo from inside your project, or set FILO_PROJECT_ROOT';
+        }
+
+        $row('tracing', $envEnabled() ? 'on (FILO_ENABLED)' : (is_file($marker) ? 'on (.filo-on)' : 'off (`filo on` turns it on)'));
+
+        $settings = Settings::load($root);
+        array_push($problems, ...$settings['problems']);
+        $row('settings', is_file($root . '/' . Settings::FILE) ? Settings::FILE : 'no ' . Settings::FILE . ': env vars and defaults');
+        $values = [
+            'exclude'      => $settings['exclude'] === [] ? '(nothing)' : implode(', ', $settings['exclude']),
+            'keep'         => $settings['keep'] === 0 ? '0 (all)' : (string) $settings['keep'],
+            'breakTimeout' => $settings['breakTimeout'] . ' s',
+        ];
+        foreach ($values as $key => $value) {
+            printf("  %-12s %-24s %s\n", $key, $value, $settings['sources'][$key] ?? '');
+        }
+
+        $traces = glob($outputDir . '/*.json') ?: [];
+        $tests  = glob($outputDir . '/tests/*.json') ?: [];
+        $bytes  = array_sum(array_map(static fn (string $f): int => (int) @filesize($f), [...$traces, ...$tests]));
+        $row('traces', sprintf('%s: %d request, %d test, %.1f MB', realpath($outputDir) ?: $outputDir, count($traces), count($tests), $bytes / 1048576));
+        if (!$writable($outputDir)) {
+            $problems[] = "{$outputDir} is not writable";
+        }
+
+        $cacheEnv = $_SERVER['FILO_CACHE_DIR'] ?? getenv('FILO_CACHE_DIR');
+        $cache    = is_string($cacheEnv) && $cacheEnv !== '' ? $cacheEnv : sys_get_temp_dir() . '/filo-cache';
+        $row('cache', realpath($cache) ?: $cache);
+        if (!$writable($cache)) {
+            $problems[] = "the cache folder {$cache} is not writable";
+        }
+
+        // git check-ignore: 0 = ignored, 1 = not ignored, anything else = no repo / no git.
+        $ignored = null;
+        $git     = @proc_open(['git', '-C', $root, 'check-ignore', '-q', '.filo/traces/x.json'], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+        if (is_resource($git)) {
+            stream_get_contents($pipes[1]);
+            stream_get_contents($pipes[2]);
+            $status  = proc_close($git);
+            $ignored = $status === 0 ? true : ($status === 1 ? false : null);
+        }
+        $row('git', match ($ignored) {
+            true    => '.filo/ is ignored',
+            false   => '.filo/ is NOT ignored',
+            default => 'not a git repository (or git not found)',
+        });
+        if ($ignored === false) {
+            $problems[] = 'git would commit .filo/, and traces hold paths and variable values: add ".filo/" to .gitignore';
+        }
+
+        $row('opcache', !function_exists('opcache_get_status')
+            ? 'not loaded'
+            : 'this CLI: ' . (ini_get('opcache.enable_cli') ? 'on' : 'off') . '; filo turns it off for every traced request');
+
+        $bps = Breakpoints::read($bpFile);
+        $row('breakpoints', sprintf('%d (%d enabled)', count($bps), count(array_filter($bps, static fn (array $bp): bool => $bp['enabled']))));
+
+        if ($problems !== []) {
+            echo "\nproblems:\n";
+            foreach ($problems as $problem) {
+                echo "  - {$problem}\n";
+            }
+            exit(1);
+        }
+        echo "\nno problems found\n";
+        break;
+
+    // Every breakpoint command keeps entries it doesn't touch as they are:
+    // the web UI writes disabled and file:line breakpoints to the same file.
     case 'breaks':
         $list = Breakpoints::read($bpFile);
         if ($list === []) {
@@ -141,8 +299,13 @@ switch ($cmd) {
         break;
 
     default:
-        echo "filo — breakpoint control\n\n";
+        echo "filo: zero-extension PHP call tracer\n\n";
+        echo "  filo on | off                    turn tracing on/off for this project (.filo-on)\n";
+        echo "  filo doctor                      check the setup: root, settings, git, opcache\n";
+        echo "  filo serve [port]                start the local web viewer (default 8090)\n";
+        echo "  filo clear                       delete traces and test artifacts\n";
         echo "  filo breaks | break <fn> | unbreak <fn>\n";
-        echo "  filo pending | show <id> | continue <id>|--all\n  filo serve [port]\n";
+        echo "  filo pending | show <id> | continue <id> | continue --all\n";
+        echo "  filo --version\n";
         break;
 }

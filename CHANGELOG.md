@@ -33,6 +33,7 @@ the README's "Public API" section says what that covers.
   it and a team can share one configuration. Env vars still win.
 - Trace retention: only the newest 200 request traces are kept (`keep`,
   `FILO_KEEP`; 0 keeps them all). Per-test artifacts are never pruned.
+- `filo on`, `filo off`, `filo clear`, `filo doctor` and `filo --version`.
 - A "Public API" section in the README, and `SECURITY.md`.
 
 ### Changed

@@ -28,11 +28,12 @@ request once enabled — it works the same under Herd, Valet, nginx+FPM,
 Apache, `artisan serve`, or plain CLI scripts.
 
 **Enable it:** create an empty `.filo-on` file in your project root
-(from your IDE file tree is fine). Browse your app as usual; every
-request writes a JSON trace to `.filo/traces/` inside your project
-(add `.filo/` to your `.gitignore`), and the newest 200 are kept.
-Delete the file to stop tracing. The check is per-request, so toggling
-is instant — no restarts.
+(from your IDE file tree is fine, or run `vendor/bin/filo on`). Browse
+your app as usual; every request writes a JSON trace to `.filo/traces/`
+inside your project (add `.filo/` to your `.gitignore`), and the newest
+200 are kept. Delete the file (or run `vendor/bin/filo off`) to stop
+tracing. The check is per-request, so toggling is instant — no restarts.
+`vendor/bin/filo doctor` checks the whole setup.
 
 **Alternative** (CI, docker-compose, one-off CLI runs): set the env var
 `FILO_ENABLED=1`. A Laravel `.env` entry does *not* work — it loads
@@ -69,6 +70,20 @@ vars easy), and how a team shares one configuration: commit it.
 |                | `FILO_PROJECT_ROOT`  | auto-detected      | Project root, for when detection picks the wrong folder    |
 
 A value filo can't use (a typo, a wrong type) is ignored, never fatal.
+`vendor/bin/filo doctor` shows every setting, where it comes from, and
+any problem.
+
+## Command line
+
+```bash
+vendor/bin/filo on | off       # turn tracing on/off for this project (.filo-on)
+vendor/bin/filo doctor         # check the setup: project root, settings, git, opcache
+vendor/bin/filo serve [port]   # the local web viewer, see below
+vendor/bin/filo clear          # delete traces and test artifacts
+vendor/bin/filo --version
+```
+
+The breakpoint commands are under [Breakpoints](#breakpoints).
 
 ## Tests & CI
 
