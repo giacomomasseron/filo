@@ -64,7 +64,8 @@ test('cachegrind sums the trace up per function, with who called whom', function
         30 25
         TXT;
 
-    expect(exportCachegrind(SampleTraces::request()))->toBe($expected . "\n\n");
+    // The exporter writes \n everywhere; a Windows checkout gives this file \r\n.
+    expect(exportCachegrind(SampleTraces::request()))->toBe(str_replace("\r\n", "\n", $expected) . "\n\n");
 });
 
 test('a capped trace says so, and names stay on one line', function (): void {

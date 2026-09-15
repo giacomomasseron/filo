@@ -274,19 +274,20 @@ switch ($cmd) {
         $what   = 'latest';
         $format = 'cachegrind';
         $target = null;
-        for ($i = 2, $n = count($argv); $i < $n; $i++) {
-            if (preg_match('/^--(format|output)=(.*)$/', $argv[$i], $m) === 1) {
+        $args = array_slice($argv ?? [], 2);
+        for ($i = 0, $n = count($args); $i < $n; $i++) {
+            if (preg_match('/^--(format|output)=(.*)$/', $args[$i], $m) === 1) {
                 if ($m[1] === 'format') {
                     $format = $m[2];
                 } else {
                     $target = $m[2];
                 }
-            } elseif (in_array($argv[$i], ['--format', '-f'], true) && isset($argv[$i + 1])) {
-                $format = $argv[++$i];
-            } elseif (in_array($argv[$i], ['--output', '-o'], true) && isset($argv[$i + 1])) {
-                $target = $argv[++$i];
+            } elseif (in_array($args[$i], ['--format', '-f'], true) && isset($args[$i + 1])) {
+                $format = $args[++$i];
+            } elseif (in_array($args[$i], ['--output', '-o'], true) && isset($args[$i + 1])) {
+                $target = $args[++$i];
             } else {
-                $what = $argv[$i];
+                $what = $args[$i];
             }
         }
 

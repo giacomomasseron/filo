@@ -14,7 +14,8 @@ namespace `Filo\`, PHP ^8.1. "filo" = Italian for thread (Ariadne's thread).
 1. `composer install`
 2. `php -l` every file in `src/`, `bootstrap.php`, `bin/filo`, `server/index.php`
 3. `FILO_ENABLED=1 vendor/bin/pest` — all green; `vendor/bin/phpstan analyse`
-   — no errors (level 8, phpstan.neon)
+   — no errors (level 8, phpstan.neon). Run PHPStan on PHP 8.5, as CI does:
+   an older runtime misses some findings (e.g. `$argv` in bin/filo).
 4. `FILO_ENABLED=1 php -d opcache.enable_cli=0 examples/smoke.php` — must print 3 PASS lines
 5. Known-risk spots, in order of suspicion:
    - token brace matching in `HookVisitor::bodyBraces()` and `Instrumenter`'s
