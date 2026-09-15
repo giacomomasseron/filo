@@ -156,7 +156,7 @@ final class Tracer
         ]);
 
         foreach ($starts as $dir) {
-            while ($dir !== '' && $dir !== '.') {
+            while ($dir !== '.') {
                 if (self::looksLikeProject($dir)) {
                     return $dir;
                 }
@@ -192,6 +192,6 @@ final class Tracer
     {
         $value = $_SERVER[$key] ?? getenv($key);
 
-        return ($value === false || $value === null || $value === '') ? $default : (string) $value;
+        return ($value === false || $value === '') ? $default : (string) $value;
     }
 }

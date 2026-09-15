@@ -60,27 +60,28 @@ switch ($cmd) {
             break;
         }
         foreach ($list as $bp) {
-            echo $bp['fn'] ?? $bp['file'] . ':' . $bp['line'], $bp['enabled'] ? '' : '  (disabled)', "\n";
+            echo isset($bp['fn']) ? $bp['fn'] : $bp['file'] . ':' . $bp['line'], $bp['enabled'] ? '' : '  (disabled)', "\n";
         }
         break;
 
     case 'break':
-        $entry = Breakpoints::normalize($arg);
-        $entry !== null || $die("usage: filo break \"App\\Foo::bar\"\n");
+        $fn = trim((string) $arg);
+        if ($fn === '') {
+            $die("usage: filo break \"App\\Foo::bar\"\n");
+        }
         $list  = Breakpoints::read($bpFile);
         $found = false;
-        foreach ($list as &$bp) {
-            if (($bp['fn'] ?? null) === $entry['fn']) {
-                $bp['enabled'] = true;
-                $found         = true;
+        foreach ($list as $i => $bp) {
+            if (($bp['fn'] ?? null) === $fn) {
+                $list[$i]['enabled'] = true;
+                $found               = true;
             }
         }
-        unset($bp);
         if (!$found) {
-            $list[] = $entry;
+            $list[] = Breakpoints::forFunction($fn);
         }
         Breakpoints::write($bpFile, $list);
-        echo "breakpoint added: {$entry['fn']}\n";
+        echo "breakpoint added: {$fn}\n";
         break;
 
     case 'unbreak':

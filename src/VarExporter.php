@@ -27,6 +27,7 @@ final class VarExporter
     /**
      * @param array<string, mixed> $vars
      * @param list<string>         $sensitive names whose values are never exported
+     * @return array<string, mixed>
      */
     public static function snapshot(array $vars, array $sensitive = []): array
     {

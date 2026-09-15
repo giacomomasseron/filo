@@ -100,6 +100,25 @@ jobs:
       - name: Smoke test
         run: FILO_ENABLED=1 php -d opcache.enable_cli=0 examples/smoke.php
 
+  phpstan:
+    name: PHPStan (level 8)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: tokenizer
+          coverage: none
+
+      # The locked dev dependencies: the same PHPUnit/Pest the analysis sees locally.
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress
+
+      - name: Analyse
+        run: vendor/bin/phpstan analyse --no-progress
+
   laravel:
     name: Laravel app on php -S (PHP 8.4, opcache on)
     runs-on: ubuntu-latest

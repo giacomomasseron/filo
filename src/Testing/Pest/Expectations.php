@@ -59,7 +59,7 @@ if (!function_exists('filo_pest_trace_of')) {
         // a test that only chains filo expectations come back "risky:
         // this test did not perform any assertions". Register one
         // explicitly so a clean pass reads as an actual pass.
-        \PHPUnit\Framework\Assert::assertTrue(true);
+        \PHPUnit\Framework\Assert::assertTrue(true); // @phpstan-ignore staticMethod.alreadyNarrowedType (counts one assertion on purpose)
     }
 }
 

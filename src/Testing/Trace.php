@@ -116,7 +116,11 @@ final class Trace
         );
     }
 
-    /** Trace format v1 — openable in the viewer. */
+    /**
+     * Trace format v1 — openable in the viewer.
+     *
+     * @return array{version: int, ts: string, duration: int, capped: bool, context: array<string, mixed>, events: list<array{i:int,p:int,fn:string,file:string,line:int,s:int,e:int,m:int}>}
+     */
     public function toArray(): array
     {
         return [

@@ -15,6 +15,8 @@ namespace Filo;
  * Dependency-free: bin/filo and server/index.php load it without Composer.
  *
  * @internal The FILE format is public (README "Breakpoints"); this class is not.
+ *
+ * @phpstan-type Entry array{id: string, fn: string, enabled: bool}|array{id: string, file: string, line: int, enabled: bool}
  */
 final class Breakpoints
 {
@@ -23,7 +25,7 @@ final class Breakpoints
         return $projectRoot . '/.filo/breakpoints.json';
     }
 
-    /** @return list<array{id:string, fn?:string, file?:string, line?:int, enabled:bool}> */
+    /** @return list<Entry> */
     public static function read(string $file): array
     {
         // @: Debugger reads this at bootstrap, where a warning would print
@@ -34,7 +36,7 @@ final class Breakpoints
         return array_values(array_filter(array_map(self::normalize(...), (array) $raw)));
     }
 
-    /** @param array<array{id:string, fn?:string, file?:string, line?:int, enabled:bool}> $list */
+    /** @param array<Entry> $list */
     public static function write(string $file, array $list): void
     {
         is_dir(dirname($file)) || @mkdir(dirname($file), 0777, true);
@@ -44,7 +46,21 @@ final class Breakpoints
         );
     }
 
-    /** A string ("App\\Foo::bar") or an entry object -> the canonical entry, or null. */
+    /**
+     * An enabled breakpoint on $fn ("App\Foo::bar", "{closure:...}").
+     *
+     * @return array{id: string, fn: string, enabled: bool}
+     */
+    public static function forFunction(string $fn): array
+    {
+        return ['id' => self::idFor($fn), 'fn' => $fn, 'enabled' => true];
+    }
+
+    /**
+     * A string ("App\\Foo::bar") or an entry object -> the canonical entry, or null.
+     *
+     * @return Entry|null
+     */
     public static function normalize(mixed $item): ?array
     {
         if (is_string($item)) {
@@ -59,17 +75,18 @@ final class Breakpoints
         if ($fn === '' && ($file === '' || $line <= 0)) {
             return null;
         }
-        $out = ['id' => isset($item['id']) && is_string($item['id']) && $item['id'] !== ''
+        $id      = isset($item['id']) && is_string($item['id']) && $item['id'] !== ''
             ? $item['id']
-            : 'bp_' . substr(md5($fn !== '' ? $fn : $file . ':' . $line), 0, 8)];
-        if ($fn !== '') {
-            $out['fn'] = $fn;
-        } else {
-            $out['file'] = $file;
-            $out['line'] = $line;
-        }
-        $out['enabled'] = !array_key_exists('enabled', $item) || (bool) $item['enabled'];
+            : self::idFor($fn !== '' ? $fn : $file . ':' . $line);
+        $enabled = !array_key_exists('enabled', $item) || (bool) $item['enabled'];
 
-        return $out;
+        return $fn !== ''
+            ? ['id' => $id, 'fn' => $fn, 'enabled' => $enabled]
+            : ['id' => $id, 'file' => $file, 'line' => $line, 'enabled' => $enabled];
+    }
+
+    private static function idFor(string $key): string
+    {
+        return 'bp_' . substr(md5($key), 0, 8);
     }
 }

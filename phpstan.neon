@@ -1,0 +1,23 @@
+parameters:
+    level: 8
+    # Analyse as the oldest PHP filo supports, so 8.2+ syntax is caught.
+    phpVersion: 80100
+    paths:
+        - src
+        - bootstrap.php
+        - bin/filo
+        - server/index.php
+        - tests/PHPStan
+    ignoreErrors:
+        -
+            # Pest binds expect()->extend() closures to an Expectation when
+            # it calls them; PHPStan can't know what $this is inside.
+            identifier: variable.undefined
+            message: '#^Undefined variable: \$this$#'
+            path: src/Testing/Pest/Expectations.php
+        -
+            # PHP calls stream_*() only on a stream stream_open() opened, and
+            # dir_*() only after dir_opendir(): the handle is a resource there.
+            identifier: argument.type
+            message: '#^Parameter \#1 \$(stream|dir_handle) of function \w+ expects resource, resource\|null given\.$#'
+            path: src/IncludeStreamWrapper.php

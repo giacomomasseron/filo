@@ -70,6 +70,6 @@ trait FiloAssertions
         } catch (ExpectationFailed $e) {
             PHPUnit::fail($e->getMessage());
         }
-        PHPUnit::assertTrue(true); // count it as an assertion
+        PHPUnit::assertTrue(true); // @phpstan-ignore staticMethod.alreadyNarrowedType (counts one assertion on purpose)
     }
 }

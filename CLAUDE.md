@@ -13,7 +13,8 @@ namespace `Filo\`, PHP ^8.1. "filo" = Italian for thread (Ariadne's thread).
 
 1. `composer install`
 2. `php -l` every file in `src/`, `bootstrap.php`, `bin/filo`, `server/index.php`
-3. `FILO_ENABLED=1 vendor/bin/pest` — all green
+3. `FILO_ENABLED=1 vendor/bin/pest` — all green; `vendor/bin/phpstan analyse`
+   — no errors (level 8, phpstan.neon)
 4. `FILO_ENABLED=1 php -d opcache.enable_cli=0 examples/smoke.php` — must print 3 PASS lines
 5. Known-risk spots, in order of suspicion:
    - token brace matching in `HookVisitor::bodyBraces()` and `Instrumenter`'s
@@ -73,6 +74,10 @@ namespace `Filo\`, PHP ^8.1. "filo" = Italian for thread (Ariadne's thread).
   `($id & 1023) === 0` — reading the static caps on every call cost ~7%.
 - **breakpoints.json has one reader/writer**: `Filo\Breakpoints`, shared by
   bin/filo, server/index.php and Debugger. Parse it nowhere else.
+- **Static analysis**: PHPStan level 8 over src, bin/filo, server,
+  bootstrap and `tests/PHPStan` (which makes it analyse the two library
+  traits). Fix errors instead of baselining them; every ignore in
+  phpstan.neon or inline says why.
 - **Pause time and cache-miss instrumentation time are excluded from
   traces** via `Collector::excludePause()` (epoch shift; callers: `Debugger`,
   `IncludeStreamWrapper::instrumentedCode()`). Don't "fix" timings by

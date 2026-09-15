@@ -51,7 +51,7 @@ final class IncludeStreamWrapper
      *
      * @var array<int, resource>
      */
-    private static array $castedHandles = [];
+    private static array $castedHandles = []; // @phpstan-ignore property.onlyWritten (holding the references is the point)
 
     /** @var resource|null set by PHP when a context is passed */
     public $context;
@@ -98,13 +98,14 @@ final class IncludeStreamWrapper
         if ($forInclude && self::eligible($path)) {
             $code = self::instrumentedCode($path);
 
-            if ($code !== null) {
-                // Serve modified source from memory. We deliberately do NOT
-                // set $openedPath to the cache file: __FILE__/__DIR__ inside
-                // the included code must keep pointing at the real source.
-                $this->handle = fopen('php://memory', 'r+b');
-                fwrite($this->handle, $code);
-                rewind($this->handle);
+            // Serve modified source from memory. We deliberately do NOT set
+            // $openedPath to the cache file: __FILE__/__DIR__ inside the
+            // included code must keep pointing at the real source.
+            $memory = $code === null ? false : fopen('php://memory', 'r+b');
+            if ($memory !== false) {
+                fwrite($memory, (string) $code);
+                rewind($memory);
+                $this->handle = $memory;
 
                 return true;
             }
@@ -126,14 +127,14 @@ final class IncludeStreamWrapper
             }
 
             return $h;
-        });
+        }) ?: null;
 
         return is_resource($this->handle);
     }
 
     public function stream_read(int $count): string|false
     {
-        return fread($this->handle, $count);
+        return fread($this->handle, max(1, $count));
     }
 
     public function stream_write(string $data): int|false
@@ -159,6 +160,7 @@ final class IncludeStreamWrapper
         $this->handle = null;
     }
 
+    /** @return array<int|string, int>|false */
     public function stream_stat(): array|false
     {
         return fstat($this->handle);
@@ -168,7 +170,7 @@ final class IncludeStreamWrapper
     {
         // Non-seekable targets (/dev/null, pipes) are legitimate here: PHP
         // seeks while casting a stream out. Report failure, don't warn.
-        if (!(stream_get_meta_data($this->handle)['seekable'] ?? false)) {
+        if (!stream_get_meta_data($this->handle)['seekable']) {
             return false;
         }
 
@@ -177,7 +179,7 @@ final class IncludeStreamWrapper
 
     public function stream_tell(): int
     {
-        return ftell($this->handle);
+        return (int) ftell($this->handle);
     }
 
     public function stream_flush(): bool
@@ -187,7 +189,7 @@ final class IncludeStreamWrapper
 
     public function stream_truncate(int $newSize): bool
     {
-        return ftruncate($this->handle, $newSize);
+        return ftruncate($this->handle, max(0, $newSize));
     }
 
     public function stream_lock(int $operation): bool
@@ -195,7 +197,7 @@ final class IncludeStreamWrapper
         // $operation === 0 is PHP's lock-CAPABILITY probe
         // (php_stream_supports_lock). Answering false makes
         // file_put_contents(..., LOCK_EX) warn and write nothing.
-        return $operation === 0 ? true : flock($this->handle, $operation);
+        return $operation === 0 ? true : flock($this->handle, $operation & 7); // LOCK_SH|LOCK_EX|LOCK_UN|LOCK_NB
     }
 
     public function stream_set_option(int $option, int $arg1, ?int $arg2): bool
@@ -221,6 +223,7 @@ final class IncludeStreamWrapper
         });
     }
 
+    /** @return resource|false */
     public function stream_cast(int $castAs)
     {
         if (!is_resource($this->handle)) {
@@ -235,6 +238,7 @@ final class IncludeStreamWrapper
     // url_stat + filesystem ops
     // ---------------------------------------------------------------
 
+    /** @return array<int|string, int>|false */
     public function url_stat(string $path, int $flags): array|false
     {
         return self::native(static function () use ($path, $flags) {
@@ -281,7 +285,7 @@ final class IncludeStreamWrapper
 
     public function dir_opendir(string $path, int $options): bool
     {
-        $this->dirHandle = self::native(static fn () => @opendir($path));
+        $this->dirHandle = self::native(static fn () => @opendir($path)) ?: null;
 
         return is_resource($this->dirHandle);
     }

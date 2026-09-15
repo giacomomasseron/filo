@@ -38,6 +38,6 @@ final class Recorder
             }
         }
 
-        return new Trace($events, $wall, $result, $enabled, $enabled && Collector::capped());
+        return new Trace($events, (int) $wall, $result, $enabled, $enabled && Collector::capped());
     }
 }

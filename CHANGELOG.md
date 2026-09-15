@@ -44,6 +44,7 @@ the README's "Public API" section says what that covers.
   `filo break` on a disabled breakpoint re-enables it instead of adding a
   duplicate.
 - Every class outside `Filo\Testing` is marked `@internal`.
+- PHPStan checks the code at level 8 in CI.
 
 ### Fixed
 
