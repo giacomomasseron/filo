@@ -2,6 +2,7 @@
     "name": "giacomomasseron/filo",
     "description": "Filo — zero-extension PHP call tracer: a stream wrapper splices hooks into your code as it loads",
     "type": "library",
+    "homepage": "https://giacomomasseron.github.io/filo/",
     "license": "MIT",
     "require": {
         "php": "^8.1",
