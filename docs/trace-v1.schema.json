@@ -43,7 +43,7 @@
             "items": { "$ref": "#/definitions/event" }
         },
         "name": {
-            "description": "Added by the viewer API (GET /api/traces), never stored: the file name under .filo/traces, e.g. \"tests/App_FooTest__testBar.json\".",
+            "description": "Never stored in trace files: the viewer API's trace summaries (GET /api/traces) carry it, the file name under .filo/traces, e.g. \"tests/App_FooTest__testBar.json\".",
             "type": "string"
         }
     },

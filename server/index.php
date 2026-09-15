@@ -10,12 +10,12 @@ declare(strict_types=1);
  * and — with breakpoints — variable values. Do not expose this port.
  *
  * ── HTTP API (contract for the designed UI) ───────────────────────────
- *  GET  /api/traces                     -> [full trace JSON + {name}], newest first, at most
- *                                          TRACE_LIST_LIMIT entries (the UI renders straight
- *                                          from `events`, so summaries aren't enough)
- *                                          tests/<Class__method>.json artifacts are listed
- *                                          with the "tests/" prefix in name
- *  GET  /api/traces/{name}              -> one full trace JSON (schema: README "Trace format")
+ *  GET  /api/traces                     -> [trace summary], newest first, at most
+ *                                          TRACE_LIST_LIMIT entries. A summary is every
+ *                                          top-level field of the trace except `events`,
+ *                                          plus `events_count` and `name` (the file name;
+ *                                          per-test artifacts are "tests/<Class__method>.json")
+ *  GET  /api/traces/{name}              -> one full trace JSON (schema: docs/trace-v1.schema.json)
  *  GET  /api/breaks                     -> [{id, fn, file, line, ts, uri, vars}]
  *  POST /api/breaks/{id}/continue       -> release one paused request
  *  POST /api/breaks/continue-all        -> release all
@@ -73,6 +73,54 @@ if (str_starts_with($path, '/api/') && $method !== 'GET' && ($_SERVER['HTTP_X_FI
 // ── /api/traces ───────────────────────────────────────────────────────
 const TRACE_LIST_LIMIT = 50;
 
+/**
+ * A trace's summary for the list: every top-level field but `events`, plus
+ * `events_count`. Every producer writes `events` last, so the fields come
+ * from the head of the file and the events are counted while streaming,
+ * never decoded: a folder of big traces can't run the viewer out of memory.
+ * Other shapes (pretty-printed, hand-made) are decoded whole, up to 4 MB.
+ * Null when the file isn't a trace.
+ *
+ * @return array<mixed>|null
+ */
+$summarize = static function (string $file): ?array {
+    $fh = @fopen($file, 'rb');
+    if ($fh === false) {
+        return null;
+    }
+    $head = '';
+    $at   = false;
+    while ($at === false && strlen($head) < 1 << 20 && ($chunk = (string) fread($fh, 1 << 16)) !== '') {
+        $head .= $chunk;
+        $at    = strpos($head, ',"events":[');
+    }
+    $summary = $at === false ? null : json_decode(substr($head, 0, $at) . '}', true);
+    if (is_array($summary)) {
+        // An event starts with `{"i":`, and a quote inside a JSON string is
+        // always escaped, so the sequence occurs nowhere else. The 4 bytes
+        // carried over count an opening split between two reads once.
+        $count = 0;
+        $buf   = substr($head, (int) $at);
+        do {
+            $count += substr_count($buf, '{"i":');
+            $buf    = substr($buf, -4) . (string) fread($fh, 1 << 16);
+        } while (strlen($buf) > 4);
+        fclose($fh);
+        $summary['events_count'] = $count;
+
+        return $summary;
+    }
+    fclose($fh);
+    $trace = (int) @filesize($file) <= 4 << 20 ? json_decode((string) file_get_contents($file), true) : null;
+    if (!is_array($trace) || !isset($trace['events']) || !is_array($trace['events'])) {
+        return null;
+    }
+    $trace['events_count'] = count($trace['events']);
+    unset($trace['events']);
+
+    return $trace;
+};
+
 if ($path === '/api/traces' && $method === 'GET') {
     // Newest first by mtime: a name sort would rank every tests/ artifact
     // (Class__method.json) above the Ymd-His request traces and, past the
@@ -87,12 +135,12 @@ if ($path === '/api/traces' && $method === 'GET') {
 
     $out = [];
     foreach (array_slice($files, 0, TRACE_LIST_LIMIT) as $f) {
-        $t = json_decode((string) file_get_contents($f), true);
-        if (!is_array($t) || !isset($t['events'])) {
+        $summary = $summarize($f);
+        if ($summary === null) {
             continue;
         }
-        $t['name'] = substr($f, strlen($dir) + 1); // "x.json" or "tests/x.json"
-        $out[]     = $t;
+        $summary['name'] = substr($f, strlen($dir) + 1); // "x.json" or "tests/x.json"
+        $out[]           = $summary;
     }
     $json($out);
 }

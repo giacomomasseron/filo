@@ -56,6 +56,12 @@ namespace `Filo\`, PHP ^8.1. "filo" = Italian for thread (Ariadne's thread).
 - **Trace format contract** = `docs/trace-v1.schema.json`, validated against
   every producer by `TraceSchemaTest`. Changing a field ⇒ change the schema
   (additive only within v1).
+- **Trace producers write `events` last** (`Collector::flush`,
+  `TestArtifact::write`, `Testing\Trace::toArray`): `GET /api/traces` builds
+  its summaries from each file's head and counts events by streaming for
+  `{"i":`, never decoding them. Another key order still works (decoded
+  whole, up to 4 MB) but loses that. The UI fetches one trace's events at a
+  time via `/api/traces/{name}`.
 - **Traces always live in `<project>/.filo/traces`** (breaks in `…/breaks`),
   via `Tracer::outputDir()` — the only place that knows the path. Not
   configurable by design; `.filo/` must be gitignored.

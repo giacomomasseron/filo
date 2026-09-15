@@ -296,8 +296,9 @@ blocks DNS-rebinding attacks from pages open in your browser. See
 
 The UI is a single bundled file, `server/ui/index.html`, that only talks to
 the JSON API (`/api/traces`, `/api/breaks`, `/api/breakpoints`; contract at
-the top of `server/index.php`). If `server/ui/` is missing, a minimal
-built-in page is served instead.
+the top of `server/index.php`). The trace list carries summaries only; a
+trace's events load when you open it, so big traces don't slow the list
+down. If `server/ui/` is missing, a minimal built-in page is served instead.
 
 ## Public API
 

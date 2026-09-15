@@ -17,6 +17,8 @@ the README's "Public API" section says what that covers.
   `\Filo\Tracer::cycle()` instead of `\Filo\Collector::cycle($dir)`.
 - **Restart PHP once** (PHP-FPM, Herd, Valet) if you traced with opcache
   enabled on 0.2: older versions could leave instrumented code in the opcache.
+- **Scripts that read `GET /api/traces`**: it now returns summaries, without
+  `events`. Fetch `GET /api/traces/{name}` for a trace's events.
 
 ### Added
 
@@ -53,6 +55,10 @@ the README's "Public API" section says what that covers.
 - Trace files are named down to the microsecond, e.g.
   `20260915-101530-123456-ab12.json`.
 - PHPStan checks the code at level 8 in CI.
+- `GET /api/traces` returns summaries: each trace's top-level fields but
+  `events`, plus `events_count` and `name`. The viewer loads a trace's events
+  when you open it, so a folder of large traces no longer slows it down or
+  runs it out of memory.
 
 ### Fixed
 
