@@ -74,6 +74,14 @@ namespace `Filo\`, PHP ^8.1. "filo" = Italian for thread (Ariadne's thread).
   `($id & 1023) === 0` — reading the static caps on every call cost ~7%.
 - **breakpoints.json has one reader/writer**: `Filo\Breakpoints`, shared by
   bin/filo, server/index.php and Debugger. Parse it nowhere else.
+- **Settings have one reader**: `Filo\Settings` resolves `exclude`, `keep`
+  and `breakTimeout` as env var > `<root>/filo.json` > default. A bad value
+  is ignored on its own (fail open) and kept in `problems`. New setting ⇒
+  add it there and to the README table.
+  `FILO_ENABLED`, `FILO_CACHE_DIR`, `FILO_PROJECT_ROOT` stay env-only.
+- **Retention**: `Tracer::prune()` keeps the newest `keep` request traces
+  after every flush (shutdown and `Tracer::cycle()`); `tests/` artifacts are
+  never pruned. Trace names carry microseconds, so name order = write order.
 - **Static analysis**: PHPStan level 8 over src, bin/filo, server,
   bootstrap and `tests/PHPStan` (which makes it analyse the two library
   traits). Fix errors instead of baselining them; every ignore in

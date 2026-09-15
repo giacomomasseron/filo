@@ -30,8 +30,9 @@ Apache, `artisan serve`, or plain CLI scripts.
 **Enable it:** create an empty `.filo-on` file in your project root
 (from your IDE file tree is fine). Browse your app as usual; every
 request writes a JSON trace to `.filo/traces/` inside your project
-(add `.filo/` to your `.gitignore`). Delete the file to stop tracing.
-The check is per-request, so toggling is instant — no restarts.
+(add `.filo/` to your `.gitignore`), and the newest 200 are kept.
+Delete the file to stop tracing. The check is per-request, so toggling
+is instant — no restarts.
 
 **Alternative** (CI, docker-compose, one-off CLI runs): set the env var
 `FILO_ENABLED=1`. A Laravel `.env` entry does *not* work — it loads
@@ -43,15 +44,31 @@ instrumented code never lands in the cache. The one exception is an FPM
 pool that pins `opcache.enable` with `php_admin_value`: that can't be
 changed at runtime, so turn opcache off there while tracing.
 
-## Configuration (env vars)
+## Configuration
 
-| Var                  | Default            | Meaning                                                  |
-|----------------------|--------------------|----------------------------------------------------------|
-| `FILO_ENABLED`       | `0`                | Master switch                                            |
-| `FILO_CACHE_DIR`     | `<tmp>/filo-cache` | Instrumented-file cache                                  |
-| `FILO_EXCLUDE`       | `vendor`           | Comma-separated path substrings to skip                  |
-| `FILO_BREAK_TIMEOUT` | `120`              | Seconds before a paused request continues on its own     |
-| `FILO_PROJECT_ROOT`  | auto-detected      | Project root, for when detection picks the wrong folder  |
+Each setting comes from its environment variable, else from `filo.json`
+in your project root, else its default. `filo.json` is how you configure
+filo when you turn it on with `.filo-on` (Herd and Valet don't make env
+vars easy), and how a team shares one configuration: commit it.
+
+```json
+{
+    "exclude": ["vendor", "storage"],
+    "keep": 200,
+    "breakTimeout": 120
+}
+```
+
+| `filo.json`    | Env var              | Default            | Meaning                                                    |
+|----------------|----------------------|--------------------|------------------------------------------------------------|
+| `exclude`      | `FILO_EXCLUDE`       | `["vendor"]`       | Path substrings to skip (env var: comma-separated)         |
+| `keep`         | `FILO_KEEP`          | `200`              | Request traces to keep, older ones are deleted (0 = all)   |
+| `breakTimeout` | `FILO_BREAK_TIMEOUT` | `120`              | Seconds before a paused request continues on its own       |
+|                | `FILO_ENABLED`       | `0`                | Master switch (the `.filo-on` file is the alternative)     |
+|                | `FILO_CACHE_DIR`     | `<tmp>/filo-cache` | Instrumented-file cache                                    |
+|                | `FILO_PROJECT_ROOT`  | auto-detected      | Project root, for when detection picks the wrong folder    |
+
+A value filo can't use (a typo, a wrong type) is ignored, never fatal.
 
 ## Tests & CI
 
@@ -274,7 +291,8 @@ From 1.0, semver covers:
 - everything in `Filo\Testing` (except members marked `@internal`)
 - `Filo\Tracer::cycle()`
 - the CLI commands, the env vars and the `.filo-on` marker
-- the file formats: `.filo/breakpoints.json` and the trace format above
+- the file formats: `filo.json`, `.filo/breakpoints.json` and the trace
+  format above
 - the viewer's HTTP API (contract at the top of `server/index.php`)
 
 Every other class and member is marked `@internal` and may change in any

@@ -263,7 +263,10 @@ final class Collector
             'events'   => array_values(self::$events),
         ];
 
-        $name = sprintf('%s-%s.json', date('Ymd-His'), bin2hex(random_bytes(4)));
+        // Named down to the microsecond, so name order is write order even
+        // within one second (Tracer::prune() keeps the newest by it).
+        $now  = microtime(true);
+        $name = sprintf('%s-%06d-%s.json', date('Ymd-His', (int) $now), (int) (($now - floor($now)) * 1_000_000), bin2hex(random_bytes(2)));
 
         @file_put_contents(
             rtrim($outputDir, '/') . '/' . $name,

@@ -28,6 +28,11 @@ the README's "Public API" section says what that covers.
 - Support for Pest 4 and 5 and PHPUnit 12 and 13. CI runs every Pest major
   from 2 to 5 on PHP 8.2 to 8.5, on Windows and macOS too, and serves a
   fresh Laravel app over `php -S` with tracing turned on and off.
+- `filo.json` in the project root for settings (`exclude`, `keep`,
+  `breakTimeout`), so people who turn filo on with `.filo-on` can configure
+  it and a team can share one configuration. Env vars still win.
+- Trace retention: only the newest 200 request traces are kept (`keep`,
+  `FILO_KEEP`; 0 keeps them all). Per-test artifacts are never pruned.
 - A "Public API" section in the README, and `SECURITY.md`.
 
 ### Changed
@@ -44,6 +49,8 @@ the README's "Public API" section says what that covers.
   `filo break` on a disabled breakpoint re-enables it instead of adding a
   duplicate.
 - Every class outside `Filo\Testing` is marked `@internal`.
+- Trace files are named down to the microsecond, e.g.
+  `20260915-101530-123456-ab12.json`.
 - PHPStan checks the code at level 8 in CI.
 
 ### Fixed

@@ -12,9 +12,11 @@ namespace Filo;
  *   FILO_ENABLED=1                     master switch (checked in bootstrap.php)
  *   FILO_CACHE_DIR=/tmp/filo-cache     instrumented-file cache
  *   (traces are ALWAYS written to <project>/.filo/traces — not configurable)
- *   FILO_EXCLUDE=vendor,storage        comma-separated path substrings to skip
- *   FILO_BREAK_TIMEOUT=120             seconds before a paused breakpoint auto-continues
  *   FILO_PROJECT_ROOT=/app             override project-root discovery (see findProjectRoot)
+ * and the settings filo.json can hold too (see Settings: env > filo.json > default):
+ *   FILO_EXCLUDE=vendor,storage        comma-separated path substrings to skip
+ *   FILO_KEEP=200                      request traces to keep (0 = all)
+ *   FILO_BREAK_TIMEOUT=120             seconds before a paused breakpoint auto-continues
  *
  * Public API: cycle(). Everything else here is @internal plumbing shared
  * by bootstrap.php, bin/filo and the viewer.
@@ -23,6 +25,9 @@ final class Tracer
 {
     private static bool $started      = false;
     private static bool $suppressFlush = false;
+
+    /** Request traces to keep in .filo/traces (0 = all); see prune(). */
+    private static int $keep = 0;
 
     /** @internal */
     public static string $cacheDir;
@@ -50,6 +55,7 @@ final class Tracer
     {
         if (self::$started) {
             Collector::cycle(self::$outputDir);
+            self::prune();
         }
     }
 
@@ -73,11 +79,12 @@ final class Tracer
         self::$outputDir   = self::outputDir(self::$projectRoot);
         self::$breaksDir   = self::$outputDir . '/breaks';
 
-        $exclude = array_filter(array_map('trim', explode(',', self::env('FILO_EXCLUDE', 'vendor'))));
+        $settings   = Settings::load(self::$projectRoot);
+        self::$keep = $settings['keep'];
 
         // Never instrument ourselves or our own caches, regardless of config.
         self::$exclude = [
-            ...$exclude,
+            ...$settings['exclude'],
             dirname(__DIR__),   // this package
             self::$cacheDir,
         ];
@@ -90,11 +97,7 @@ final class Tracer
         }
 
         Collector::begin();
-        Debugger::init(
-            self::$projectRoot,
-            self::$breaksDir,
-            (int) self::env('FILO_BREAK_TIMEOUT', '120'),
-        );
+        Debugger::init(self::$projectRoot, self::$breaksDir, $settings['breakTimeout']);
 
         // Works for FPM, CLI and the built-in server. Long-running runtimes
         // (Octane, RoadRunner, FrankenPHP worker mode) should instead call
@@ -102,6 +105,7 @@ final class Tracer
         register_shutdown_function(static function (): void {
             if (!self::$suppressFlush) {
                 Collector::flush(self::$outputDir);
+                self::prune();
             }
         });
 
@@ -181,6 +185,27 @@ final class Tracer
     public static function outputDir(?string $projectRoot = null): string
     {
         return ($projectRoot ?? self::findProjectRoot()) . '/.filo/traces';
+    }
+
+    /**
+     * Keeps the newest self::$keep request traces (0 = all). Per-test
+     * artifacts in tests/ are left alone: there is one per test at most.
+     */
+    private static function prune(): void
+    {
+        $files = self::$keep > 0 ? (glob(self::$outputDir . '/*.json') ?: []) : [];
+        if (count($files) <= self::$keep) {
+            return;
+        }
+        $mtime = [];
+        foreach ($files as $file) {
+            $mtime[$file] = (int) @filemtime($file);
+        }
+        // Newest first: by mtime, then by name, which is down to the microsecond.
+        usort($files, static fn (string $a, string $b): int => [$mtime[$b], $b] <=> [$mtime[$a], $a]);
+        foreach (array_slice($files, self::$keep) as $old) {
+            @unlink($old);
+        }
     }
 
     private static function looksLikeProject(string $dir): bool
