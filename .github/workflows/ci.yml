@@ -119,6 +119,26 @@ jobs:
       - name: Analyse
         run: vendor/bin/phpstan analyse --no-progress
 
+  # The numbers go to the run's summary page; only a failure to measure
+  # fails the job.
+  overhead:
+    name: Overhead (PHP 8.4)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: tokenizer
+          coverage: none
+
+      - name: Install runtime dependencies
+        run: composer install --no-dev --no-interaction --no-progress
+
+      - name: Measure filo's overhead
+        run: php examples/bench.php
+
   laravel:
     name: Laravel app on php -S (PHP 8.4, opcache on)
     runs-on: ubuntu-latest
@@ -144,3 +164,7 @@ jobs:
 
       - name: Serve traced and untraced requests
         run: php "$GITHUB_WORKSPACE/filo/.github/scripts/laravel-smoke.php" "$RUNNER_TEMP/app"
+
+      # Like the overhead job: a table on the run's summary page.
+      - name: Time traced and untraced requests
+        run: php "$GITHUB_WORKSPACE/filo/.github/scripts/laravel-overhead.php" "$RUNNER_TEMP/app"

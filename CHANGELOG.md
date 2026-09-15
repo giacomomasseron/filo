@@ -36,6 +36,9 @@ the README's "Public API" section says what that covers.
 - Trace retention: only the newest 200 request traces are kept (`keep`,
   `FILO_KEEP`; 0 keeps them all). Per-test artifacts are never pruned.
 - `filo on`, `filo off`, `filo clear`, `filo doctor` and `filo --version`.
+- `examples/bench.php`, which measures what tracing costs, and an "Overhead"
+  section in the README with its numbers. CI publishes those numbers, with the times of a
+  traced and an untraced Laravel request, on every run's summary page.
 - A "Public API" section in the README, and `SECURITY.md`.
 
 ### Changed

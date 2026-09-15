@@ -300,6 +300,43 @@ the top of `server/index.php`). The trace list carries summaries only; a
 trace's events load when you open it, so big traces don't slow the list
 down. If `server/ui/` is missing, a minimal built-in page is served instead.
 
+## Overhead
+
+Tracing is for development: a traced request runs slower, and this is how
+much. `php examples/bench.php` measures it on your machine, and CI
+publishes the same tables on every run's summary page.
+
+Measured on Linux (Ubuntu 24.04 on WSL2, AMD Ryzen 5 3600XT, PHP 8.3):
+
+| What | Cost |
+|---|---|
+| Each traced call (function, method or closure) | about 0.8 µs, and 400 bytes until the request ends |
+| Writing the trace when the request ends | about 0.65 µs per call |
+| Including a file the first time, or after it changes: filo parses and instruments it, then caches the result | about 6.6 ms for a 190-line file |
+| Including it again, from that cache | about 0.15 ms more than plain PHP |
+| Tracing off | about 27 µs per request with opcache: two env vars and at most three file checks |
+
+So 10,000 calls of your own code add about 8 ms while they run, 6.5 ms to
+write the trace, and 4 MB of memory. `vendor/` isn't traced by default, so
+framework calls cost nothing extra. On Windows (Herd, same machine) a call
+costs about 1 µs, and everything that touches files is two to six times
+slower.
+
+A traced request also runs without opcache, which filo switches off for
+it, and in a fresh Laravel app that costs more than filo itself (median of
+20 requests to `/` over `php -S`):
+
+| Request | Time |
+|---|--:|
+| Untraced, opcache on | 11.5 ms |
+| Untraced, opcache off | 79.5 ms |
+| Traced | 73.9 ms |
+| First traced request after emptying filo's cache | 153.2 ms |
+
+The fresh app's traced request records only 4 calls of its own code. It
+beats the untraced request without opcache because the files PHP loads
+before filo starts, like Composer's autoloader, still come from opcache.
+
 ## Public API
 
 From 1.0, semver covers:

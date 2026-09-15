@@ -165,4 +165,5 @@ Arrow functions, native functions, eval'd code = caller self-time.
 PHP 8.1+ syntax, `declare(strict_types=1)` everywhere, final classes,
 static hot paths in `Collector`/`Debugger` (no DI — bootstrap runs before
 any container exists). Hot-path code (enter/leave/hit) must stay
-allocation-light; measure before adding anything there.
+allocation-light; measure (`php examples/bench.php`) before adding anything
+there, and update the README "Overhead" numbers when they move.
