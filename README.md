@@ -9,7 +9,7 @@ stream wrapper that splices hooks into your code as it loads (parsed with
 nikic/php-parser), keeping every line where it was. Original files are
 never modified; instrumented copies live only in a throwaway cache.
 
-<p align="center"><a href="https://giacomomasseron.github.io/filo/"><strong>Documentation</strong></a> &nbsp;·&nbsp; <a href="https://giacomomasseron.github.io/filo/demo.html"><strong>Demo</strong></a></p>
+<p align="center"><a href="https://giacomomasseron.github.io/filo/"><strong>Website</strong></a> &nbsp;·&nbsp; <a href="https://giacomomasseron.github.io/filo/demo.html"><strong>Demo</strong></a></p>
 
 ## Install
 
