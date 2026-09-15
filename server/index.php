@@ -27,7 +27,8 @@ declare(strict_types=1);
  * breakpoints.json stores the object form. Only `fn` breakpoints can fire
  * (Debugger matches __METHOD__); file:line entries are kept for the UI
  * but never trigger — see Debugger.php.
- *  GET  /                               -> built-in minimal UI (replaceable)
+ *  GET  /                               -> the UI (server/ui/index.html), or a minimal
+ *                                          built-in page when server/ui/ is missing
  *
  * Mutating endpoints (POST/PUT) REQUIRE the header `X-Filo: 1`. A custom
  * header forces a CORS preflight, which this server never answers, so a
@@ -147,8 +148,8 @@ if (str_starts_with($path, '/api/')) {
 }
 
 // ── designed UI (drop-in) ─────────────────────────────────────────────
-// If server/ui/ exists (e.g. an exported Claude Design build), serve it
-// and skip the placeholder below. Explicit whitelist + basename() only:
+// The shipped UI (a Claude Design export) lives in server/ui/: serve it and
+// skip the fallback page below. Explicit whitelist + basename() only:
 // with a php -S router script, `return false` would resolve against the
 // project root and expose source files — never do that here.
 $uiDir = __DIR__ . '/ui';
@@ -185,8 +186,8 @@ if (is_dir($uiDir)) {
 }
 
 // ── built-in minimal UI ───────────────────────────────────────────────
-// Functional placeholder: the designed UI (see docs/ui-brief) replaces
-// this page but keeps every /api/* endpoint above unchanged.
+// Fallback, served only when server/ui/ is missing. It uses the same /api/*
+// endpoints as the shipped UI.
 header('Content-Type: text/html; charset=utf-8');
 ?><!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>filo</title>

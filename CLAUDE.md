@@ -22,8 +22,9 @@ namespace `Filo\`, PHP ^8.1. "filo" = Italian for thread (Ariadne's thread).
      `IncludeStreamWrapper::stream_open()` on the target SAPI
    - `stream_stat()` on the `php://memory` handle serving instrumented includes
 6. Breakpoints end-to-end: `examples/break-demo.php` (two terminals, see its header)
-7. `vendor/bin/filo serve` — the inline JS in `server/index.php` is untested;
-   verify trace list renders, call tree expands, continue button releases a pause
+7. `vendor/bin/filo serve` — the UI (`server/ui/index.html`) has no automated
+   tests; verify the trace list renders, the call tree expands, continue
+   releases a pause
 
 ## Architecture invariants (do not break these)
 
@@ -113,8 +114,9 @@ namespace `Filo\`, PHP ^8.1. "filo" = Italian for thread (Ariadne's thread).
   inspect-and-continue via files (poll for `<id>.continue`), auto-timeout
   `FILO_BREAK_TIMEOUT` (120s). No stepping, no eval — Xdebug's territory.
 - Web viewer: `filo serve` (php -S, localhost-only). `server/index.php` =
-  JSON API (contract in its header comment) + placeholder HTML. A designed
-  UI (being produced in Claude Design) will replace the HTML, never the API.
+  JSON API (contract in its header comment, public from 1.0) + a minimal
+  fallback page. The real UI is the Claude Design export in `server/ui/`;
+  it may be replaced, the API may not.
 - Trace format v1: flat events `{i,p,fn,file,line,s,e,m}`, ns offsets;
   see README "Trace format". `examples/sample-trace.json` is the fixture;
   `docs/trace-v1.schema.json` (published via GitHub Pages) is the contract.
@@ -133,10 +135,9 @@ Arrow functions, native functions, eval'd code = caller self-time.
 2. ~~Exact line numbers~~ — done: hooks are spliced into the original source.
 3. Long-running runtime adapters (Octane/RoadRunner: `Tracer::cycle()`).
 4. Sampling mode (instrument N% of requests) for staging.
-5. Designed web UI from Claude Design: drop exported files into server/ui/
-   (served automatically, flat dir, extension whitelist in server/index.php).
-   Never serve static files via `return false` in the php -S router — it
-   resolves against project root and exposes source.
+5. ~~Designed web UI~~ — shipped in server/ui/ (flat dir, extension
+   whitelist in server/index.php). Never serve static files via `return false`
+   in the php -S router — it resolves against project root and exposes source.
 6. Unit tests for VarExporter, HookVisitor output snapshots, Debugger
    timeout path (descoped from the test-integration plan).
 

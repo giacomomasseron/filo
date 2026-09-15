@@ -45,11 +45,13 @@ changed at runtime, so turn opcache off there while tracing.
 
 ## Configuration (env vars)
 
-| Var                 | Default               | Meaning                                   |
-|---------------------|-----------------------|-------------------------------------------|
-| `FILO_ENABLED`    | `0`                   | Master switch                             |
-| `FILO_CACHE_DIR`  | `<tmp>/filo-cache`  | Instrumented-file cache                   |
-| `FILO_EXCLUDE`    | `vendor`              | Comma-separated path substrings to skip   |
+| Var                  | Default            | Meaning                                                  |
+|----------------------|--------------------|----------------------------------------------------------|
+| `FILO_ENABLED`       | `0`                | Master switch                                            |
+| `FILO_CACHE_DIR`     | `<tmp>/filo-cache` | Instrumented-file cache                                  |
+| `FILO_EXCLUDE`       | `vendor`           | Comma-separated path substrings to skip                  |
+| `FILO_BREAK_TIMEOUT` | `120`              | Seconds before a paused request continues on its own     |
+| `FILO_PROJECT_ROOT`  | auto-detected      | Project root, for when detection picks the wrong folder  |
 
 ## Tests & CI
 
@@ -251,20 +253,18 @@ Rules of engagement:
 vendor/bin/filo serve        # http://127.0.0.1:8090
 ```
 
-A zero-dependency local viewer (PHP built-in server, single file):
-trace list, call tree with self-times, top-functions table, and live
-paused-request panel with continue buttons. Localhost-only by design —
+A local viewer on PHP's built-in server: a flamegraph, the call tree with
+self times, the top functions by self time, and a panel of paused requests
+with their variables and a continue button. Localhost-only by design —
 traces contain paths and variable values; never expose the port. Requests
 whose `Host` isn't `127.0.0.1`, `localhost` or `[::1]` are refused, which
-blocks DNS-rebinding attacks from pages open in your browser.
+blocks DNS-rebinding attacks from pages open in your browser. See
+[SECURITY.md](SECURITY.md).
 
-The built-in page is a functional placeholder. To install a designed UI
-(e.g. exported from Claude Design), copy its files into `server/ui/`
-(entry point `index.html`, assets flat in the same directory). When that
-directory exists it is served instead of the placeholder — no code
-changes. The UI must call the JSON API with relative paths
-(`/api/traces`, `/api/breaks`, `/api/breakpoints`; contract documented
-at the top of `server/index.php`). Delete `server/ui/` to fall back.
+The UI is a single bundled file, `server/ui/index.html`, that only talks to
+the JSON API (`/api/traces`, `/api/breaks`, `/api/breakpoints`; contract at
+the top of `server/index.php`). If `server/ui/` is missing, a minimal
+built-in page is served instead.
 
 ## Public API
 
