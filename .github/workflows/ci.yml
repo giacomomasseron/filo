@@ -7,18 +7,27 @@ on:
 
 jobs:
   test:
-    name: PHP ${{ matrix.php }}${{ matrix.deps == 'lowest' && ' (lowest deps)' || '' }}
-    runs-on: ubuntu-latest
+    name: PHP ${{ matrix.php }} · Pest ${{ matrix.pest }}${{ matrix.deps == 'lowest' && ' · lowest deps' || '' }}${{ matrix.os != 'ubuntu-latest' && format(' · {0}', matrix.os) || '' }}
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     strategy:
       fail-fast: false
       matrix:
-        # 8.1 is a runtime target but not a dev one: Pest 2's lowest resolvable
-        # set on 8.1 pins an advisory-blocked PHPUnit. See the php81 job.
-        php: ['8.2', '8.3', '8.4']
-        deps: [highest]
+        # Each Pest major (Pest 2 runs on PHPUnit 10, 3 on 11, 4 on 12, 5 on 13)
+        # runs on the oldest and the newest PHP it supports. 8.1 is a runtime
+        # target but not a dev one: see the php81 job.
         include:
-          - php: '8.2'
-            deps: lowest
+          - { os: ubuntu-latest,  php: '8.2', pest: '2', deps: lowest }
+          - { os: ubuntu-latest,  php: '8.2', pest: '3' }
+          - { os: ubuntu-latest,  php: '8.5', pest: '3' }
+          - { os: ubuntu-latest,  php: '8.3', pest: '4' }
+          - { os: ubuntu-latest,  php: '8.5', pest: '4' }
+          - { os: ubuntu-latest,  php: '8.4', pest: '5' }
+          - { os: ubuntu-latest,  php: '8.5', pest: '5' }
+          - { os: windows-latest, php: '8.5', pest: '5' }
+          - { os: macos-latest,   php: '8.5', pest: '5' }
     steps:
       - uses: actions/checkout@v4
 
@@ -29,16 +38,13 @@ jobs:
           ini-values: opcache.enable_cli=0
           coverage: none
 
-      - name: Install dependencies
-        run: |
-          if [ "${{ matrix.deps }}" = "lowest" ]; then
-            composer update --prefer-lowest --prefer-stable --no-interaction --no-progress
-          else
-            composer update --no-interaction --no-progress
-          fi
-
       - name: Validate composer.json
         run: composer validate --strict
+
+      - name: Install dependencies (Pest ${{ matrix.pest }})
+        run: |
+          composer require --dev --no-update --no-interaction "pestphp/pest:^${{ matrix.pest }}.0"
+          composer update --no-interaction --no-progress ${{ matrix.deps == 'lowest' && '--prefer-lowest --prefer-stable' || '' }}
 
       - name: Lint
         run: |
@@ -48,16 +54,16 @@ jobs:
         run: FILO_ENABLED=1 php -d opcache.enable_cli=0 examples/smoke.php
 
       - name: Test suite (filo enabled)
-        run: FILO_ENABLED=1 vendor/bin/pest --colors=always
+        run: FILO_ENABLED=1 php vendor/bin/pest --colors=always
 
       - name: Unit tests without filo (assertions must fail loudly)
-        run: vendor/bin/pest --colors=always tests/Unit
+        run: php vendor/bin/pest --colors=always tests/Unit
 
       - name: Upload traces on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: filo-traces-php${{ matrix.php }}-${{ matrix.deps }}
+          name: filo-traces-php${{ matrix.php }}-pest${{ matrix.pest }}-${{ matrix.os }}
           path: .filo/traces/
           if-no-files-found: ignore
 
@@ -81,10 +87,36 @@ jobs:
         run: |
           for f in src/*.php src/Testing/*.php src/Testing/*/*.php bootstrap.php bin/filo server/index.php; do php -l "$f"; done
 
-      # Runtime deps only: the dev tooling (Pest 2, paratest) requires PHP >= 8.2,
+      # Runtime deps only: the dev tooling (Pest 2+, paratest) requires PHP >= 8.2,
       # and --no-dev still RESOLVES require-dev, so install from the lock instead.
       - name: Install runtime dependencies
         run: composer install --no-dev --no-interaction --no-progress
 
       - name: Smoke test
         run: FILO_ENABLED=1 php -d opcache.enable_cli=0 examples/smoke.php
+
+  laravel:
+    name: Laravel app on php -S (PHP 8.4, opcache on)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: filo
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: tokenizer, pdo_sqlite
+          coverage: none
+
+      # Installed like a Packagist release (copied, not symlinked), so the
+      # app sees the same vendor/giacomomasseron/filo layout users get.
+      - name: Create a Laravel app that installs filo from this checkout
+        run: |
+          composer create-project laravel/laravel "$RUNNER_TEMP/app" --no-interaction --no-progress
+          cd "$RUNNER_TEMP/app"
+          composer config repositories.filo "{\"type\": \"path\", \"url\": \"$GITHUB_WORKSPACE/filo\", \"options\": {\"symlink\": false}}"
+          composer require --dev "giacomomasseron/filo:*@dev" --no-interaction --no-progress
+
+      - name: Serve traced and untraced requests
+        run: php "$GITHUB_WORKSPACE/filo/.github/scripts/laravel-smoke.php" "$RUNNER_TEMP/app"

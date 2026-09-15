@@ -7,7 +7,7 @@ a `file://` stream wrapper intercepts every include, parses it
 copies live only in a cache. Composer package `giacomomasseron/filo`,
 namespace `Filo\`, PHP ^8.1. "filo" = Italian for thread (Ariadne's thread).
 
-## Status: verified on PHP 8.5 locally; CI matrix 8.1–8.4 in .github/workflows/ci.yml
+## Status: CI (.github/workflows/ci.yml) runs PHP 8.2–8.5 × Pest 2–5 (PHPUnit 10–13) on Linux, plus Windows, macOS, a runtime-only 8.1 job and a Laravel app over php -S (`.github/scripts/laravel-smoke.php`). New Pest/PHPUnit major ⇒ widen require-dev and add matrix rows.
 
 ## Verification pass (do this first)
 

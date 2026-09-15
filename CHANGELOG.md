@@ -25,6 +25,9 @@ the README's "Public API" section says what that covers.
 - A JSON Schema for the trace format, `docs/trace-v1.schema.json`, published
   at <https://giacomomasseron.github.io/filo/trace-v1.schema.json>.
 - Breakpoints can target a single closure by its name.
+- Support for Pest 4 and 5 and PHPUnit 12 and 13. CI runs every Pest major
+  from 2 to 5 on PHP 8.2 to 8.5, on Windows and macOS too, and serves a
+  fresh Laravel app over `php -S` with tracing turned on and off.
 - A "Public API" section in the README, and `SECURITY.md`.
 
 ### Changed
