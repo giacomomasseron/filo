@@ -7,6 +7,17 @@ the README's "Public API" section says what that covers.
 
 ## [Unreleased]
 
+### Added
+
+- `filo break` and `filo unbreak` take a file and line too, e.g.
+  `filo break app/Services/OrderService.php:42`.
+
+### Fixed
+
+- Breakpoints on a file and line, which the web viewer lets you add, now
+  pause the request: at the entry of the innermost function or closure
+  containing that line. They used to never fire.
+
 ## [1.0.0] - 2026-09-15
 
 The first stable release. From here on, the public API in the README's

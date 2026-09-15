@@ -132,6 +132,9 @@ namespace `Filo\`, PHP ^8.1. "filo" = Italian for thread (Ariadne's thread).
 - Breakpoints are ENTRY-only, once per request per breakpoint,
   inspect-and-continue via files (poll for `<id>.continue`), auto-timeout
   `FILO_BREAK_TIMEOUT` (120s). No stepping, no eval — Xdebug's territory.
+  A file:line breakpoint fires at the entry of the innermost hooked
+  function containing the line: HookVisitor passes each function's line
+  range, and its nested functions' ranges, to `Debugger::hit()`.
 - Web viewer: `filo serve` (php -S, localhost-only). `server/index.php` =
   JSON API (contract in its header comment, public from 1.0) + a minimal
   fallback page. The real UI is the Claude Design export in `server/ui/`;

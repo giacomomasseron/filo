@@ -24,7 +24,7 @@ use RuntimeException;
  *
  *   prologue, right after the body's `{`:
  *      $__trc = \Filo\Collector::enter(__METHOD__, __FILE__, 42); try {
- *      if (\Filo\Debugger::$armed && \Filo\Debugger::hit(__METHOD__)) {
+ *      if (\Filo\Debugger::$armed && \Filo\Debugger::hit(__METHOD__, '/app/src/Foo.php', 42, 60, [[45, 49]])) {
  *      \Filo\Debugger::pause(__METHOD__, get_defined_vars(), __FILE__, 42); }
  *   epilogue, right before the closing `}`:
  *      } finally { \Filo\Collector::leave($__trc); }
@@ -45,6 +45,12 @@ use RuntimeException;
  *    Inside an anonymous class the scope reads "class@anonymous::m()"
  *    (PHP 8.4 embeds a path and a compile counter there instead).
  *  - The line passed to enter()/pause() is the function's start line.
+ *  - hit() also gets the file (Breakpoints::pathKey() of its real path),
+ *    the function's first and last line, and the line ranges of the hooked
+ *    functions nested in it, so a file:line breakpoint fires at the entry
+ *    of the innermost hooked function containing the line. The nested
+ *    ranges are known once the body has been traversed: the insertions
+ *    are made in leaveNode().
  *  - Breakpoints are ENTRY breakpoints: get_defined_vars() at the top
  *    of the body captures the arguments. For non-static methods we also
  *    pass ['__this' => $this]; static context and closures skip it.
@@ -82,13 +88,25 @@ final class HookVisitor extends NodeVisitorAbstract
     private array $scopes = [];
 
     /**
+     * Function-likes being traversed, innermost last: the parts of the hook
+     * for a body that gets one, null for one that doesn't.
+     *
+     * @var array<int, array{open: int, close: int, fn: string, line: int, end: int, args: string, nested: list<array{int, int}>}|null>
+     */
+    private array $frames = [];
+
+    /** The file as hit() compares it, as a PHP literal. */
+    private readonly string $fileKey;
+
+    /**
      * @param array<int, Token> $tokens the parser's tokens for the same source
-     * @param string            $file   real path of the source, names top-level closures
+     * @param string            $file   real path of the source: names top-level closures, locates line breakpoints
      */
     public function __construct(
         private readonly array $tokens,
         private readonly string $file = '',
     ) {
+        $this->fileKey = var_export($file === '' ? '' : Breakpoints::pathKey($file), true);
     }
 
     /** @return list<array{int, string}> */
@@ -129,6 +147,8 @@ final class HookVisitor extends NodeVisitorAbstract
         };
 
         if ($node->stmts === null || $node->stmts === []) {
+            $this->frames[] = null;
+
             return null; // abstract, interface, or empty body — nothing to time
         }
 
@@ -149,10 +169,10 @@ final class HookVisitor extends NodeVisitorAbstract
             )) . ']';
         }
 
-        $this->insertions[] = [$open + 1, " \$__trc = \\Filo\\Collector::enter({$fn}, __FILE__, {$line}); try { "
-            . "if (\\Filo\\Debugger::\$armed && \\Filo\\Debugger::hit({$fn})) { "
-            . "\\Filo\\Debugger::pause({$fn}, {$args}); } "];
-        $this->insertions[] = [$close, ' } finally { \Filo\Collector::leave($__trc); } '];
+        $this->frames[] = [
+            'open' => $open, 'close' => $close, 'fn' => $fn, 'line' => $line,
+            'end'  => $node->getEndLine(), 'args' => $args, 'nested' => [],
+        ];
 
         return null;
     }
@@ -163,12 +183,42 @@ final class HookVisitor extends NodeVisitorAbstract
             $this->namespace = '';
         } elseif ($node instanceof ClassLike) {
             array_pop($this->classes);
-        } elseif ($node instanceof Function_ || $node instanceof ClassMethod
-            || $node instanceof Closure || $node instanceof ArrowFunction) {
+        } elseif ($node instanceof ArrowFunction) {
             array_pop($this->scopes);
+        } elseif ($node instanceof Function_ || $node instanceof ClassMethod || $node instanceof Closure) {
+            array_pop($this->scopes);
+            $frame = array_pop($this->frames);
+            if ($frame !== null) {
+                $this->hook($frame);
+                // Its lines belong to it, not to the hooked function around it.
+                for ($i = count($this->frames) - 1; $i >= 0; $i--) {
+                    if ($this->frames[$i] !== null) {
+                        $this->frames[$i]['nested'][] = [$frame['line'], $frame['end']];
+                        break;
+                    }
+                }
+            }
         }
 
         return null;
+    }
+
+    /** @param array{open: int, close: int, fn: string, line: int, end: int, args: string, nested: list<array{int, int}>} $frame */
+    private function hook(array $frame): void
+    {
+        $fn    = $frame['fn'];
+        $where = "{$this->fileKey}, {$frame['line']}, {$frame['end']}";
+        if ($frame['nested'] !== []) {
+            $where .= ', [' . implode(', ', array_map(
+                static fn (array $range): string => "[{$range[0]}, {$range[1]}]",
+                $frame['nested'],
+            )) . ']';
+        }
+
+        $this->insertions[] = [$frame['open'] + 1, " \$__trc = \\Filo\\Collector::enter({$fn}, __FILE__, {$frame['line']}); try { "
+            . "if (\\Filo\\Debugger::\$armed && \\Filo\\Debugger::hit({$fn}, {$where})) { "
+            . "\\Filo\\Debugger::pause({$fn}, {$frame['args']}); } "];
+        $this->insertions[] = [$frame['close'], ' } finally { \Filo\Collector::leave($__trc); } '];
     }
 
     /**

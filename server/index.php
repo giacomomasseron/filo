@@ -24,9 +24,9 @@ declare(strict_types=1);
  *                                          (a legacy {"breakpoints": [...]} wrapper and
  *                                          plain "Class::method" strings are accepted too)
  *
- * breakpoints.json stores the object form. Only `fn` breakpoints can fire
- * (Debugger matches __METHOD__); file:line entries are kept for the UI
- * but never trigger — see Debugger.php.
+ * breakpoints.json stores the object form; a "path/File.php:42" string is
+ * read as a file entry. A file:line breakpoint pauses at the entry of the
+ * innermost function containing that line — see Debugger.php.
  *  GET  /                               -> the UI (server/ui/index.html), or a minimal
  *                                          built-in page when server/ui/ is missing
  *

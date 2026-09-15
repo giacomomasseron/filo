@@ -22,7 +22,7 @@ use Throwable;
 final class Instrumenter
 {
     /** Part of the cache key: bump when the transform changes. */
-    public const VERSION = '6';
+    public const VERSION = '7';
 
     /** @param string $file the source's real path; names top-level closures */
     public static function instrument(string $source, string $file = ''): ?string

@@ -9,12 +9,15 @@ namespace Filo;
  *
  * How it works:
  *  - Breakpoints live in <project>/.filo/breakpoints.json, read through
- *    Filo\Breakpoints (shared with `bin/filo` and the viewer API). Names
- *    match what __METHOD__ yields at runtime ("App\Service\Foo::bar",
- *    "my_function"). Reloaded per request (init() / cycle()).
- *  - The instrumented code evaluates `Debugger::$armed && Debugger::hit(__METHOD__)`
+ *    Filo\Breakpoints (shared with `bin/filo` and the viewer API) and
+ *    reloaded per request (init() / cycle()). One names a function as
+ *    __METHOD__ yields it at runtime ("App\Service\Foo::bar",
+ *    "my_function", "{closure:...}"), or a file and line: that one fires
+ *    at the entry of the innermost function containing the line.
+ *  - The instrumented code evaluates `Debugger::$armed && Debugger::hit(...)`
  *    at every function entry — a single static property read when
- *    disarmed; the call only happens when breakpoints exist.
+ *    disarmed; the call only happens when breakpoints exist. hit() gets
+ *    the function's name, file and line ranges (see HookVisitor).
  *  - On a hit, pause() writes a snapshot JSON (function, location,
  *    exported locals) into <output>/breaks/<id>.json and then POLLS
  *    for <id>.continue (or a global continue-all). The request is
@@ -23,8 +26,8 @@ namespace Filo;
  *    (default 120) so a forgotten breakpoint can never hang a request
  *    forever.
  *
- * Deliberate scope (v2): entry-only breakpoints, once per breakpoint
- * per request, inspect-and-continue — no stepping, no eval. That's the
+ * Deliberate scope: entry-only breakpoints, once per breakpoint per
+ * request, inspect-and-continue — no stepping, no eval. That's the
  * honest boundary of userland instrumentation; people who need
  * engine-level stepping have Xdebug.
  *
@@ -35,8 +38,11 @@ final class Debugger
     /** Checked first in the injected hook — keep it a plain public static. */
     public static bool $armed = false;
 
-    /** @var array<string, true> breakpoint names as hash-set */
+    /** @var array<string, true> function breakpoints as hash-set */
     private static array $breakpoints = [];
+
+    /** @var array<string, array<string, int>> file breakpoints: Breakpoints::fileKey() => [hit key => line] */
+    private static array $lines = [];
 
     /** @var array<string, true> breakpoints already hit this request */
     private static array $hits = [];
@@ -60,28 +66,58 @@ final class Debugger
      */
     public static function cycle(): void
     {
-        self::$hits = [];
-
-        // Only enabled `fn` entries arm; {file, line} entries can't fire in
-        // an entry-only debugger and are ignored here (the UI still lists them).
+        self::$hits        = [];
         self::$breakpoints = [];
+        self::$lines       = [];
         foreach (Breakpoints::read(Breakpoints::file(self::$projectRoot)) as $bp) {
-            if ($bp['enabled'] && isset($bp['fn'])) {
+            if (!$bp['enabled']) {
+                continue;
+            }
+            if (isset($bp['fn'])) {
                 self::$breakpoints[$bp['fn']] = true;
+            } else {
+                $file                                          = Breakpoints::fileKey($bp['file'], self::$projectRoot);
+                self::$lines[$file][$file . ':' . $bp['line']] = $bp['line'];
             }
         }
 
-        self::$armed = self::$breakpoints !== [];
+        self::$armed = self::$breakpoints !== [] || self::$lines !== [];
 
         if (self::$armed && !is_dir(self::$breaksDir)) {
             @mkdir(self::$breaksDir, 0777, true);
         }
     }
 
-    /** Called at instrumented function entry when $armed — must stay trivial. */
-    public static function hit(string $fn): bool
+    /**
+     * Called at instrumented function entry when $armed — must stay cheap.
+     * True when a breakpoint that hasn't fired this request matches: one on
+     * $fn, or one on a line of $file from $start to $end that none of the
+     * $nested functions (hooked on their own) contains, i.e. a line this is
+     * the innermost function of. Every match counts as hit, so an entry
+     * pauses once.
+     *
+     * @param list<array{int, int}> $nested
+     */
+    public static function hit(string $fn, string $file = '', int $start = 0, int $end = 0, array $nested = []): bool
     {
-        return isset(self::$breakpoints[$fn]) && !isset(self::$hits[$fn]);
+        $hit = isset(self::$breakpoints[$fn]) && !isset(self::$hits[$fn]);
+        if ($hit) {
+            self::$hits[$fn] = true;
+        }
+        foreach (self::$lines[$file] ?? [] as $key => $line) {
+            if ($line < $start || $line > $end || isset(self::$hits[$key])) {
+                continue;
+            }
+            foreach ($nested as [$from, $to]) {
+                if ($line >= $from && $line <= $to) {
+                    continue 2;
+                }
+            }
+            self::$hits[$key] = true;
+            $hit              = true;
+        }
+
+        return $hit;
     }
 
     /**
@@ -92,8 +128,6 @@ final class Debugger
      */
     public static function pause(string $fn, array $vars, string $file, int $line, array $sensitive = []): void
     {
-        self::$hits[$fn] = true;
-
         // Everything from here on — snapshot export included — is
         // excluded from the trace timeline (see the finally-like tail).
         $start = hrtime(true);

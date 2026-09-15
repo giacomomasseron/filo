@@ -87,3 +87,21 @@ test('filo breaks lists disabled and file:line breakpoints too', function (): vo
         ->and($out)->toContain('/app/src/Foo.php:12')
         ->and($out)->toContain('App\On::live');
 });
+
+test('filo break and unbreak take a file and line too', function (): void {
+    $root = projectWithUiBreakpoints();
+
+    [$code, $out] = filoCli($root, 'break', 'src/Checkout.php:42');
+    expect($code)->toBe(0, $out)
+        ->and($out)->toContain('breakpoint added: src/Checkout.php:42')
+        ->and(savedBreakpoints($root)[3])->toMatchArray(['file' => 'src/Checkout.php', 'line' => 42, 'enabled' => true])
+        ->and(filoCli($root, 'breaks')[1])->toContain('src/Checkout.php:42');
+
+    // The same file by its absolute path is the same breakpoint.
+    filoCli($root, 'break', $root . '/src/Checkout.php:42');
+    expect(savedBreakpoints($root))->toHaveCount(4);
+
+    [$code, $out] = filoCli($root, 'unbreak', 'src/Checkout.php:42');
+    expect($code)->toBe(0, $out)
+        ->and(array_column(savedBreakpoints($root), 'id'))->toBe(['bp_off', 'bp_line', 'bp_on']);
+});

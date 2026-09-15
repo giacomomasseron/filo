@@ -249,7 +249,16 @@ vendor/bin/filo break "App\\Services\\OrderService::listForUser"
 ```
 
 A closure is targeted by its trace name, e.g.
-`"{closure:App\\Services\\OrderService::listForUser():42}"`.
+`"{closure:App\\Services\\OrderService::listForUser():42}"`. Or give a file
+and line, relative to the project root or absolute:
+
+```bash
+vendor/bin/filo break app/Services/OrderService.php:42
+```
+
+That pauses when the innermost function or closure containing line 42 is
+entered: breakpoints stop at a function's entry, never in the middle of
+one, and a line outside any function never pauses.
 
 Then trigger the code path (browse the page, run the command). The
 request **freezes** at that function's entry. From another terminal:

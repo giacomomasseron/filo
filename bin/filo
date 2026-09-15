@@ -12,8 +12,8 @@ declare(strict_types=1);
  *   filo serve [port]                start the local web viewer (default 8090)
  *   filo clear                       delete traces and test artifacts
  *   filo breaks                      list configured breakpoints
- *   filo break "App\Foo::bar"        add a breakpoint
- *   filo unbreak "App\Foo::bar"      remove a breakpoint
+ *   filo break "App\Foo::bar"        add a breakpoint (or path/to/File.php:42)
+ *   filo unbreak "App\Foo::bar"      remove a breakpoint (or path/to/File.php:42)
  *   filo pending                     list requests currently paused
  *   filo show <id>                   dump a paused request's variables
  *   filo continue <id> | --all       release one / every paused request
@@ -218,37 +218,43 @@ switch ($cmd) {
             break;
         }
         foreach ($list as $bp) {
-            echo isset($bp['fn']) ? $bp['fn'] : $bp['file'] . ':' . $bp['line'], $bp['enabled'] ? '' : '  (disabled)', "\n";
+            echo Breakpoints::label($bp), $bp['enabled'] ? '' : '  (disabled)', "\n";
         }
         break;
 
     case 'break':
-        $fn = trim((string) $arg);
-        if ($fn === '') {
-            $die("usage: filo break \"App\\Foo::bar\"\n");
+        $entry = Breakpoints::normalize(trim((string) $arg));
+        if ($entry === null) {
+            $die("usage: filo break \"App\\Foo::bar\" | path/to/File.php:42\n");
         }
         $list  = Breakpoints::read($bpFile);
         $found = false;
         foreach ($list as $i => $bp) {
-            if (($bp['fn'] ?? null) === $fn) {
+            if (Breakpoints::same($bp, $entry, $root)) {
                 $list[$i]['enabled'] = true;
                 $found               = true;
             }
         }
         if (!$found) {
-            $list[] = Breakpoints::forFunction($fn);
+            $list[] = $entry;
         }
         Breakpoints::write($bpFile, $list);
-        echo "breakpoint added: {$fn}\n";
+        echo 'breakpoint added: ', Breakpoints::label($entry), "\n";
         break;
 
     case 'unbreak':
-        $arg !== null || $die("usage: filo unbreak \"App\\Foo::bar\"\n");
-        Breakpoints::write($bpFile, array_filter(
-            Breakpoints::read($bpFile),
-            static fn (array $bp): bool => ($bp['fn'] ?? null) !== $arg,
-        ));
-        echo "breakpoint removed: {$arg}\n";
+        $entry = Breakpoints::normalize(trim((string) $arg));
+        if ($entry === null) {
+            $die("usage: filo unbreak \"App\\Foo::bar\" | path/to/File.php:42\n");
+        }
+        $kept = [];
+        foreach (Breakpoints::read($bpFile) as $bp) {
+            if (!Breakpoints::same($bp, $entry, $root)) {
+                $kept[] = $bp;
+            }
+        }
+        Breakpoints::write($bpFile, $kept);
+        echo 'breakpoint removed: ', Breakpoints::label($entry), "\n";
         break;
 
     case 'pending':
@@ -304,7 +310,7 @@ switch ($cmd) {
         echo "  filo doctor                      check the setup: root, settings, git, opcache\n";
         echo "  filo serve [port]                start the local web viewer (default 8090)\n";
         echo "  filo clear                       delete traces and test artifacts\n";
-        echo "  filo breaks | break <fn> | unbreak <fn>\n";
+        echo "  filo breaks | break <fn>|<file:line> | unbreak <fn>|<file:line>\n";
         echo "  filo pending | show <id> | continue <id> | continue --all\n";
         echo "  filo --version\n";
         break;
