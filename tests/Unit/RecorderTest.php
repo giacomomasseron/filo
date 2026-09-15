@@ -67,12 +67,15 @@ test('capture excludes paused time from the wall clock', function (): void {
     if (!Recorder::enabled()) {
         $this->markTestSkipped('needs FILO_ENABLED=1');
     }
+    // Exclude the pause as measured, like Debugger::pause(): a sleep can
+    // last far longer than asked (macOS CI runners oversleep 20 ms by ~80).
     $t = Recorder::capture(function (): void {
-        usleep(20_000);
-        Collector::excludePause(20_000_000); // as Debugger does after a pause
+        $start = hrtime(true);
+        usleep(50_000);
+        Collector::excludePause(hrtime(true) - $start);
     });
 
-    expect($t->wallMs())->toBeLessThan(15.0);
+    expect($t->wallMs())->toBeLessThan(10.0); // only the capture's own overhead is left
 });
 
 test('capture excludes first-include instrumentation time from the wall clock', function (): void {
